@@ -1,0 +1,109 @@
+:root {
+  color: #f4ead5;
+  background: #15110e;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background:
+    radial-gradient(circle at top, #38291e 0, #15110e 44rem);
+}
+
+button {
+  cursor: pointer;
+  font: inherit;
+}
+
+.app {
+  width: min(780px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+header {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  color: #e5b75d;
+  font-size: clamp(2.25rem, 7vw, 4rem);
+  letter-spacing: 0.06em;
+}
+
+header p {
+  color: #c9bca6;
+}
+
+.card {
+  border: 1px solid #5a4837;
+  border-radius: 0.8rem;
+  padding: 1.5rem;
+  background: #241c16;
+  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 25%);
+}
+
+.count {
+  margin-top: 0;
+  color: #d4aa5b;
+  font-weight: 700;
+}
+
+h2 {
+  margin-bottom: 0.65rem;
+  color: #fff4dd;
+  font-size: 1.75rem;
+}
+
+.description {
+  color: #d5c7af;
+  line-height: 1.6;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.details div {
+  border: 1px solid #4c3d31;
+  border-radius: 0.45rem;
+  padding: 0.75rem;
+  background: #30251d;
+}
+
+dt {
+  color: #b9a98e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+dd {
+  margin: 0.3rem 0 0;
+  color: #fff5e3;
+  font-weight: 800;
+}
+
+button {
+  border: 1px solid #e5b75d;
+  border-radius: 0.45rem;
+  padding: 0.75rem 1rem;
+  color: #261a0d;
+  background: #e5b75d;
+  font-weight: 800;
+}
+
+button:hover {
+  background: #f2ca79;
+}
