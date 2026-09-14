@@ -42,6 +42,36 @@ const skillData = rawSkillData as SkillDataFile;
 
 export const skills = skillData.skills;
 
+const professionAttributeLabels: Record<number, Record<number, string>> = {
+  7: {
+    29: 'Dagger Mastery',
+    30: 'Deadly Arts',
+    31: 'Shadow Arts',
+    35: 'Critical Strikes',
+  },
+
+  8: {
+    32: 'Communing',
+    33: 'Restoration Magic',
+    34: 'Channeling Magic',
+    36: 'Spawning Power',
+  },
+
+  9: {
+    37: 'Spear Mastery',
+    38: 'Command',
+    39: 'Motivation',
+    40: 'Leadership',
+  },
+
+  10: {
+    41: 'Scythe Mastery',
+    42: 'Wind Prayers',
+    43: 'Earth Prayers',
+    44: 'Mysticism',
+  },
+};
+
 function labelFor(
   labels: Record<number, string>,
   value: number,
@@ -59,7 +89,11 @@ export function professionName(skill: Skill) {
 }
 
 export function attributeName(skill: Skill) {
-  return attributeLabels[skill.attribute] ?? 'None';
+  return (
+    professionAttributeLabels[skill.profession]?.[skill.attribute] ??
+    attributeLabels[skill.attribute] ??
+    'None'
+  );
 }
 
 export function typeName(skill: Skill) {
