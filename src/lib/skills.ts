@@ -24,7 +24,10 @@ export type Skill = {
   activation: number | null;
   aftercast: number | null;
   recharge: number | null;
+
   pvpSplit: boolean;
+  pvpOnly: boolean;
+  roleplayOnly: boolean;
 };
 
 type SkillDataFile = {
