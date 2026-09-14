@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import {
   attributeName,
   campaignName,
+  dailyDateKey,
+  dailySkill,
   professionName,
   randomSkill,
   skills,
@@ -13,6 +15,7 @@ import './App.css';
 
 const MAX_GUESSES = 6;
 
+type GameMode = 'daily' | 'practice';
 type Result = 'correct' | 'higher' | 'lower' | 'none';
 
 type GradedGuess = {
@@ -30,6 +33,10 @@ type GradedGuess = {
   };
 };
 
+function answerForMode(mode: GameMode): Skill {
+  return mode === 'daily' ? dailySkill() : randomSkill();
+}
+
 function compareText(guess: string, answer: string): Result {
   return guess === answer ? 'correct' : 'none';
 }
@@ -42,6 +49,10 @@ function compareNumber(
   guess: number | null,
   answer: number | null,
 ): Result {
+  if (guess === null && answer === null) {
+    return 'correct';
+  }
+
   if (guess === null || answer === null) {
     return 'none';
   }
@@ -90,7 +101,8 @@ function ResultArrow({ result }: { result: Result }) {
 }
 
 export default function App() {
-  const [answer, setAnswer] = useState<Skill>(() => randomSkill());
+  const [mode, setMode] = useState<GameMode>('daily');
+  const [answer, setAnswer] = useState<Skill>(() => answerForMode('daily'));
   const [guesses, setGuesses] = useState<GradedGuess[]>([]);
   const [input, setInput] = useState('');
   const [message, setMessage] = useState('');
@@ -104,6 +116,18 @@ export default function App() {
   const won = guesses.some((guess) => guess.skill.id === answer.id);
   const lost = guesses.length >= MAX_GUESSES && !won;
   const gameOver = won || lost;
+
+  function resetRound(nextMode = mode) {
+    setAnswer(answerForMode(nextMode));
+    setGuesses([]);
+    setInput('');
+    setMessage('');
+  }
+
+  function changeMode(nextMode: GameMode) {
+    setMode(nextMode);
+    resetRound(nextMode);
+  }
 
   function submitGuess(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -134,18 +158,47 @@ export default function App() {
     setMessage('');
   }
 
-  function newGame() {
-    setAnswer(randomSkill());
-    setGuesses([]);
-    setInput('');
-    setMessage('');
-  }
-
   return (
     <main className="app">
       <header className="page-header">
         <h1>GW Skilldle</h1>
-        <p>Guess the Guild Wars skill in {MAX_GUESSES} attempts.</p>
+
+        <p>
+          Guess {mode === 'daily' ? 'today’s' : 'a'} Guild Wars skill in{' '}
+          {MAX_GUESSES} attempts.
+        </p>
+
+        <div className="mode-switcher" aria-label="Game mode">
+          <button
+            type="button"
+            className={
+              mode === 'daily' ? 'mode-button active' : 'mode-button'
+            }
+            onClick={() => changeMode('daily')}
+          >
+            Daily
+          </button>
+
+          <button
+            type="button"
+            className={
+              mode === 'practice' ? 'mode-button active' : 'mode-button'
+            }
+            onClick={() => changeMode('practice')}
+          >
+            Practice
+          </button>
+        </div>
+
+        {mode === 'daily' && (
+          <p className="daily-date">Daily puzzle: {dailyDateKey()}</p>
+        )}
+
+        {mode === 'practice' && (
+          <p className="daily-date">
+            Practice mode: unlimited random skills.
+          </p>
+        )}
       </header>
 
       <section className="legend" aria-label="Feedback legend">
@@ -268,8 +321,8 @@ export default function App() {
 
           <p className="answer-description">{answer.description}</p>
 
-          <button type="button" onClick={newGame}>
-            New random skill
+          <button type="button" onClick={() => resetRound()}>
+            {mode === 'daily' ? 'Restart today’s puzzle' : 'Next random skill'}
           </button>
         </section>
       )}
