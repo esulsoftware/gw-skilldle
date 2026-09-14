@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   attributeName,
@@ -14,6 +14,7 @@ import {
 import './App.css';
 
 const MAX_GUESSES = 6;
+const DAILY_STORAGE_PREFIX = 'gw-skilldle-daily-v1';
 
 type GameMode = 'daily' | 'practice';
 type Result = 'correct' | 'higher' | 'lower' | 'none';
@@ -35,6 +36,10 @@ type GradedGuess = {
 
 function answerForMode(mode: GameMode): Skill {
   return mode === 'daily' ? dailySkill() : randomSkill();
+}
+
+function dailyStorageKey(): string {
+  return `${DAILY_STORAGE_PREFIX}:${dailyDateKey()}`;
 }
 
 function compareText(guess: string, answer: string): Result {
@@ -106,6 +111,11 @@ export default function App() {
   const [guesses, setGuesses] = useState<GradedGuess[]>([]);
   const [input, setInput] = useState('');
   const [message, setMessage] = useState('');
+  const [dailyProgressLoaded, setDailyProgressLoaded] = useState(false);
+
+  const skillById = useMemo(() => {
+    return new Map(skills.map((skill) => [skill.id, skill]));
+  }, []);
 
   const skillByNormalizedName = useMemo(() => {
     return new Map(
@@ -117,6 +127,54 @@ export default function App() {
   const lost = guesses.length >= MAX_GUESSES && !won;
   const gameOver = won || lost;
 
+  useEffect(() => {
+    const savedProgress = window.localStorage.getItem(dailyStorageKey());
+
+    if (!savedProgress) {
+      setDailyProgressLoaded(true);
+      return;
+    }
+
+    try {
+      const savedSkillIds: unknown = JSON.parse(savedProgress);
+
+      if (!Array.isArray(savedSkillIds)) {
+        setDailyProgressLoaded(true);
+        return;
+      }
+
+      const restoredGuesses = savedSkillIds
+        .filter((id): id is number => typeof id === 'number')
+        .map((id) => skillById.get(id))
+        .filter((skill): skill is Skill => skill !== undefined)
+        .slice(0, MAX_GUESSES)
+        .map((skill) => gradeGuess(skill, dailySkill()));
+
+      setGuesses(restoredGuesses);
+    } catch {
+      window.localStorage.removeItem(dailyStorageKey());
+    } finally {
+      setDailyProgressLoaded(true);
+    }
+  }, [skillById]);
+
+  useEffect(() => {
+    if (mode !== 'daily' || !dailyProgressLoaded) {
+      return;
+    }
+
+    const guessedSkillIds = guesses.map((guess) => guess.skill.id);
+
+    try {
+      window.localStorage.setItem(
+        dailyStorageKey(),
+        JSON.stringify(guessedSkillIds),
+      );
+    } catch {
+      // The game still works if browser storage is unavailable.
+    }
+  }, [dailyProgressLoaded, guesses, mode]);
+
   function resetRound(nextMode = mode) {
     setAnswer(answerForMode(nextMode));
     setGuesses([]);
@@ -125,8 +183,51 @@ export default function App() {
   }
 
   function changeMode(nextMode: GameMode) {
+    if (nextMode === mode) {
+      return;
+    }
+
     setMode(nextMode);
-    resetRound(nextMode);
+    setInput('');
+    setMessage('');
+
+    if (nextMode === 'daily') {
+      const savedProgress = window.localStorage.getItem(dailyStorageKey());
+
+      if (!savedProgress) {
+        setAnswer(dailySkill());
+        setGuesses([]);
+        return;
+      }
+
+      try {
+        const savedSkillIds: unknown = JSON.parse(savedProgress);
+
+        if (!Array.isArray(savedSkillIds)) {
+          setAnswer(dailySkill());
+          setGuesses([]);
+          return;
+        }
+
+        const restoredGuesses = savedSkillIds
+          .filter((id): id is number => typeof id === 'number')
+          .map((id) => skillById.get(id))
+          .filter((skill): skill is Skill => skill !== undefined)
+          .slice(0, MAX_GUESSES)
+          .map((skill) => gradeGuess(skill, dailySkill()));
+
+        setAnswer(dailySkill());
+        setGuesses(restoredGuesses);
+      } catch {
+        setAnswer(dailySkill());
+        setGuesses([]);
+      }
+
+      return;
+    }
+
+    setAnswer(randomSkill());
+    setGuesses([]);
   }
 
   function submitGuess(event: FormEvent<HTMLFormElement>) {
@@ -154,6 +255,14 @@ export default function App() {
       gradeGuess(selectedSkill, answer),
     ]);
 
+    setInput('');
+    setMessage('');
+  }
+
+  function resetDailyProgress() {
+    window.localStorage.removeItem(dailyStorageKey());
+    setAnswer(dailySkill());
+    setGuesses([]);
     setInput('');
     setMessage('');
   }
@@ -321,9 +430,15 @@ export default function App() {
 
           <p className="answer-description">{answer.description}</p>
 
-          <button type="button" onClick={() => resetRound()}>
-            {mode === 'daily' ? 'Restart today’s puzzle' : 'Next random skill'}
-          </button>
+          {mode === 'daily' ? (
+            <button type="button" onClick={resetDailyProgress}>
+              Restart today’s puzzle
+            </button>
+          ) : (
+            <button type="button" onClick={() => resetRound()}>
+              Next random skill
+            </button>
+          )}
         </section>
       )}
     </main>
