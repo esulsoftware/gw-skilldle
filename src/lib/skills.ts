@@ -78,3 +78,29 @@ export function findSkillByName(name: string): Skill | undefined {
     (skill) => skill.name.toLocaleLowerCase() === normalizedName,
   );
 }
+
+export function dailyDateKey(date = new Date()): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+export function dailySkill(date = new Date()): Skill {
+  const key = `gw-skilldle-v1:${dailyDateKey(date)}`;
+  const index = hashString(key) % skills.length;
+
+  return skills[index];
+}
