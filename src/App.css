@@ -300,3 +300,19 @@ h1 {
   background: #17110d;
   object-fit: cover;
 }
+
+.revealed-answer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
+.revealed-answer-icon {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #9f7b43;
+  border-radius: 0.3rem;
+  background: #17110d;
+  object-fit: cover;
+}

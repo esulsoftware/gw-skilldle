@@ -464,9 +464,21 @@ export default function App() {
         <section className={`game-over ${won ? 'won' : 'lost'}`}>
           <h2>{won ? 'Solved!' : 'Out of guesses'}</h2>
 
-          <p>
-            The skill was <strong>{answer.name}</strong>.
-          </p>
+          <div className="revealed-answer">
+            <img
+              className="revealed-answer-icon"
+              src={skillIconPath(answer)}
+              alt=""
+              aria-hidden="true"
+              onError={(event) => {
+                event.currentTarget.style.display = 'none';
+              }}
+            />
+
+            <p>
+              The skill was <strong>{answer.name}</strong>.
+            </p>
+          </div>
 
           <p className="answer-description">{answer.description}</p>
 
