@@ -15,6 +15,18 @@ import './App.css';
 
 const MAX_GUESSES = 6;
 const DAILY_STORAGE_PREFIX = 'gw-skilldle-daily-v1';
+const PROFESSION_FILTERS = [
+  'Warrior',
+  'Ranger',
+  'Monk',
+  'Necromancer',
+  'Mesmer',
+  'Elementalist',
+  'Assassin',
+  'Ritualist',
+  'Paragon',
+  'Dervish',
+] as const;
 
 type GameMode = 'daily' | 'practice';
 type Result = 'correct' | 'higher' | 'lower' | 'none';
@@ -93,6 +105,10 @@ function formatNumber(value: number | null, suffix = '') {
   return value === null ? '—' : `${value}${suffix}`;
 }
 
+function skillIconPath(skill: Skill): string {
+  return `/skill-icons/${skill.id}.png`;
+}
+
 function ResultArrow({ result }: { result: Result }) {
   if (result === 'higher') {
     return <span aria-label="The answer is higher">↑</span>;
@@ -105,17 +121,50 @@ function ResultArrow({ result }: { result: Result }) {
   return null;
 }
 
-export default function App() {
-  const [mode, setMode] = useState<GameMode>('daily');
-  const [answer, setAnswer] = useState<Skill>(() => answerForMode('daily'));
-  const [guesses, setGuesses] = useState<GradedGuess[]>([]);
-  const [input, setInput] = useState('');
-  const [message, setMessage] = useState('');
-  const [dailyProgressLoaded, setDailyProgressLoaded] = useState(false);
+function restoreDailyGuesses(
+  skillById: Map<number, Skill>,
+): GradedGuess[] {
+  try {
+    const savedProgress = window.localStorage.getItem(dailyStorageKey());
 
+    if (!savedProgress) {
+      return [];
+    }
+
+    const savedSkillIds: unknown = JSON.parse(savedProgress);
+
+    if (!Array.isArray(savedSkillIds)) {
+      return [];
+    }
+
+    return savedSkillIds
+      .filter((id): id is number => typeof id === 'number')
+      .map((id) => skillById.get(id))
+      .filter((skill): skill is Skill => skill !== undefined)
+      .slice(0, MAX_GUESSES)
+      .map((skill) => gradeGuess(skill, dailySkill()));
+  } catch {
+    return [];
+  }
+}
+
+export default function App() {
   const skillById = useMemo(() => {
     return new Map(skills.map((skill) => [skill.id, skill]));
   }, []);
+
+  const [mode, setMode] = useState<GameMode>('daily');
+  const [answer, setAnswer] = useState<Skill>(() => dailySkill());
+  const [guesses, setGuesses] = useState<GradedGuess[]>(() =>
+    restoreDailyGuesses(skillById),
+  );
+  const [input, setInput] = useState('');
+  const [message, setMessage] = useState('');
+
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [selectedProfession, setSelectedProfession] = useState<
+    (typeof PROFESSION_FILTERS)[number]
+  >('Warrior');
 
   const skillByNormalizedName = useMemo(() => {
     return new Map(
@@ -123,57 +172,36 @@ export default function App() {
     );
   }, []);
 
+    const librarySkills = useMemo(() => {
+  return [...skills]
+    .filter((skill) => professionName(skill) === selectedProfession)
+    .sort((first, second) =>
+      first.name.localeCompare(second.name, undefined, {
+        sensitivity: 'base',
+      }),
+    );
+}, [selectedProfession]);
+
   const won = guesses.some((guess) => guess.skill.id === answer.id);
   const lost = guesses.length >= MAX_GUESSES && !won;
   const gameOver = won || lost;
 
   useEffect(() => {
-    const savedProgress = window.localStorage.getItem(dailyStorageKey());
+  if (mode !== 'daily') {
+    return;
+  }
 
-    if (!savedProgress) {
-      setDailyProgressLoaded(true);
-      return;
-    }
+  const guessedSkillIds = guesses.map((guess) => guess.skill.id);
 
-    try {
-      const savedSkillIds: unknown = JSON.parse(savedProgress);
-
-      if (!Array.isArray(savedSkillIds)) {
-        setDailyProgressLoaded(true);
-        return;
-      }
-
-      const restoredGuesses = savedSkillIds
-        .filter((id): id is number => typeof id === 'number')
-        .map((id) => skillById.get(id))
-        .filter((skill): skill is Skill => skill !== undefined)
-        .slice(0, MAX_GUESSES)
-        .map((skill) => gradeGuess(skill, dailySkill()));
-
-      setGuesses(restoredGuesses);
-    } catch {
-      window.localStorage.removeItem(dailyStorageKey());
-    } finally {
-      setDailyProgressLoaded(true);
-    }
-  }, [skillById]);
-
-  useEffect(() => {
-    if (mode !== 'daily' || !dailyProgressLoaded) {
-      return;
-    }
-
-    const guessedSkillIds = guesses.map((guess) => guess.skill.id);
-
-    try {
-      window.localStorage.setItem(
-        dailyStorageKey(),
-        JSON.stringify(guessedSkillIds),
-      );
-    } catch {
-      // The game still works if browser storage is unavailable.
-    }
-  }, [dailyProgressLoaded, guesses, mode]);
+  try {
+    window.localStorage.setItem(
+      dailyStorageKey(),
+      JSON.stringify(guessedSkillIds),
+    );
+  } catch {
+    // The game still works if browser storage is unavailable.
+  }
+}, [guesses, mode]);
 
   function resetRound(nextMode = mode) {
     setAnswer(answerForMode(nextMode));
@@ -333,7 +361,19 @@ export default function App() {
 
         {guesses.map((guess) => (
           <div className="board-row" key={guess.skill.id}>
-            <div className="skill-name">{guess.skill.name}</div>
+            <div className="skill-name">
+              <img
+                className="guess-skill-icon"
+                src={skillIconPath(guess.skill)}
+                alt=""
+                aria-hidden="true"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
+              />
+
+              <span>{guess.skill.name}</span>
+            </div>
 
             <div className={`tile ${guess.results.profession}`}>
               {professionName(guess.skill)}
@@ -441,6 +481,100 @@ export default function App() {
           )}
         </section>
       )}
+
+            <section className="skill-library" aria-labelledby="skill-library-title">
+        <div className="library-heading">
+          <div>
+            <h2 id="skill-library-title">Skill Library</h2>
+            <p>Browse skills by profession without affecting your game.</p>
+          </div>
+
+          <button
+            type="button"
+            className="library-toggle"
+            onClick={() => setLibraryOpen((isOpen) => !isOpen)}
+            aria-expanded={libraryOpen}
+            aria-controls="skill-library-content"
+          >
+            {libraryOpen ? 'Hide skills' : 'Browse skills'}
+          </button>
+        </div>
+
+        {libraryOpen && (
+          <div id="skill-library-content" className="library-content">
+            <div
+              className="profession-filters"
+              aria-label="Filter skill library by profession"
+            >
+              {PROFESSION_FILTERS.map((profession) => (
+                <button
+                  key={profession}
+                  type="button"
+                  className={
+                    selectedProfession === profession
+                      ? 'profession-button active'
+                      : 'profession-button'
+                  }
+                  onClick={() => setSelectedProfession(profession)}
+                >
+                  {profession}
+                </button>
+              ))}
+            </div>
+
+            <p className="library-count">
+              {librarySkills.length} {selectedProfession} skills
+            </p>
+
+            <ul className="skill-list">
+              {librarySkills.map((skill) => (
+                <li key={skill.id} className="skill-list-item">
+                  <div className="library-skill-top">
+                    <img
+                      className="skill-icon"
+                      src={skillIconPath(skill)}
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      //  onError={(event) => {
+                      //   event.currentTarget.style.display = 'none';
+                      // }} 
+                    />
+
+                    <div className="library-skill-name">
+                      {skill.name}
+
+                      {skill.elite && (
+                        <span className="elite-tag">Elite</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="library-skill-meta">
+                    <span>{attributeName(skill)}</span>
+                    <span>{typeName(skill)}</span>
+                    <span>{campaignName(skill)}</span>
+                    <span>Energy: {formatNumber(skill.energy)}</span>
+                    <span>Adren.: {formatNumber(skill.adrenaline)}</span>
+                    <span>
+                      Cast: {formatNumber(skill.activation, 's')}
+                    </span>
+                    <span>
+                      Recharge: {formatNumber(skill.recharge, 's')}
+                    </span>
+                  </div>
+
+                  {skill.description && (
+                    <p className="library-skill-description">
+                      {skill.description}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

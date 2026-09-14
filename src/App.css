@@ -235,3 +235,68 @@ h1 {
     flex-direction: column;
   }
 }
+
+.mode-switcher {
+  display: inline-flex;
+  overflow: hidden;
+  margin-top: 0.8rem;
+  border: 1px solid #7a6243;
+  border-radius: 0.5rem;
+  background: #292019;
+}
+
+.mode-button {
+  border: 0;
+  border-radius: 0;
+  padding: 0.55rem 0.9rem;
+  color: #d5c7ae;
+  background: transparent;
+  font-weight: 700;
+}
+
+.mode-button:hover {
+  background: #403127;
+}
+
+.mode-button.active {
+  color: #271b0d;
+  background: #e5b75d;
+}
+
+.daily-date {
+  margin-top: 0.55rem;
+  color: #b9a98e;
+  font-size: 0.85rem;
+}
+
+.library-skill-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.skill-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border: 1px solid #9f7b43;
+  border-radius: 0.3rem;
+  background: #17110d;
+  object-fit: cover;
+}
+
+.skill-name {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.guess-skill-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid #9f7b43;
+  border-radius: 0.2rem;
+  background: #17110d;
+  object-fit: cover;
+}
