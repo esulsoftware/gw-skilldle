@@ -55,27 +55,29 @@ export const attributeLabels: Record<number, string> = {
   25: 'Marksmanship',
 
   26: 'Dagger Mastery',
-  27: 'Deadly Arts',
-  28: 'Shadow Arts',
-  29: 'Shadow Arts',
+27: 'Deadly Arts',
+28: 'Shadow Arts',
+29: 'Critical Strikes',
 
-  30: 'Communing',
-  31: 'Restoration Magic',
-  32: 'Channeling Magic',
-  33: 'Spawning Power',
+30: 'Communing',
+31: 'Restoration Magic',
+32: 'Channeling Magic',
+33: 'Spawning Power',
 
-  34: 'Leadership',
-  35: 'Spear Mastery',
-  36: 'Motivation',
-  37: 'Mysticism',
-  38: 'Command',
+34: 'Leadership',
+35: 'Spear Mastery',
+36: 'Command',
+37: 'Spear Mastery',
+38: 'Command',
+39: 'Motivation',
+40: 'Leadership',
 
-  39: 'Scythe Mastery',
-  40: 'Wind Prayers',
-  41: 'Earth Prayers',
-  42: 'Mysticism',
+41: 'Scythe Mastery',
+42: 'Wind Prayers',
+43: 'Earth Prayers',
+44: 'Mysticism',
 
-  43: 'None',
+45: 'None',
 };
 
 export const typeLabels: Record<number, string> = {

@@ -1,3 +1,7 @@
 node_modules/
 dist/
 src/data/skills.raw.json
+skill
+skill-types.txt
+tmp/
+skill-icon-download-report.csv

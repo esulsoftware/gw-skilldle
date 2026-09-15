@@ -316,3 +316,57 @@ h1 {
   background: #17110d;
   object-fit: cover;
 }
+
+.give-up-button {
+  margin-top: 0.75rem;
+  border: 1px solid #8f4f3c;
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  color: #f3d5c6;
+  background: #48251f;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.give-up-button:hover {
+  background: #633126;
+}
+
+.fan-project-notice {
+  max-width: 46rem;
+  margin: 0.75rem auto 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #8b6a35;
+  border-radius: 0.45rem;
+  color: #f1dfb5;
+  background: rgba(45, 33, 17, 0.72);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.site-footer {
+  max-width: 70rem;
+  margin: 3rem auto 1rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #5c4a31;
+  color: #c7bda9;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.site-footer p {
+  margin: 0.5rem 0;
+}
+
+.site-footer a {
+  color: #e5c36e;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.site-footer a:hover {
+  color: #fff0b3;
+}

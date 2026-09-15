@@ -13,8 +13,7 @@ import {
 } from './lib/skills';
 import './App.css';
 
-const MAX_GUESSES = 6;
-const DAILY_STORAGE_PREFIX = 'gw-skilldle-daily-v1';
+const DAILY_STORAGE_PREFIX = 'gw-skilldle-daily-v2';
 const PROFESSION_FILTERS = [
   'Warrior',
   'Ranger',
@@ -44,6 +43,11 @@ type GradedGuess = {
     activation: Result;
     recharge: Result;
   };
+};
+
+type DailyProgress = {
+  guessedSkillIds: number[];
+  gaveUp: boolean;
 };
 
 function answerForMode(mode: GameMode): Skill {
@@ -121,30 +125,54 @@ function ResultArrow({ result }: { result: Result }) {
   return null;
 }
 
-function restoreDailyGuesses(
+function restoreDailyProgress(
   skillById: Map<number, Skill>,
-): GradedGuess[] {
+): DailyProgress {
   try {
     const savedProgress = window.localStorage.getItem(dailyStorageKey());
 
     if (!savedProgress) {
-      return [];
+      return {
+        guessedSkillIds: [],
+        gaveUp: false,
+      };
     }
 
-    const savedSkillIds: unknown = JSON.parse(savedProgress);
+    const parsedProgress: unknown = JSON.parse(savedProgress);
 
-    if (!Array.isArray(savedSkillIds)) {
-      return [];
+    if (
+      typeof parsedProgress !== 'object' ||
+      parsedProgress === null ||
+      Array.isArray(parsedProgress)
+    ) {
+      return {
+        guessedSkillIds: [],
+        gaveUp: false,
+      };
     }
 
-    return savedSkillIds
+    const progress = parsedProgress as Partial<DailyProgress>;
+
+    if (!Array.isArray(progress.guessedSkillIds)) {
+      return {
+        guessedSkillIds: [],
+        gaveUp: false,
+      };
+    }
+
+    const validIds = progress.guessedSkillIds
       .filter((id): id is number => typeof id === 'number')
-      .map((id) => skillById.get(id))
-      .filter((skill): skill is Skill => skill !== undefined)
-      .slice(0, MAX_GUESSES)
-      .map((skill) => gradeGuess(skill, dailySkill()));
+      .filter((id) => skillById.has(id));
+
+    return {
+      guessedSkillIds: validIds,
+      gaveUp: progress.gaveUp === true,
+    };
   } catch {
-    return [];
+    return {
+      guessedSkillIds: [],
+      gaveUp: false,
+    };
   }
 }
 
@@ -153,11 +181,19 @@ export default function App() {
     return new Map(skills.map((skill) => [skill.id, skill]));
   }, []);
 
+  const initialDailyProgress = useMemo(
+    () => restoreDailyProgress(skillById),
+    [skillById],
+  );
+
   const [mode, setMode] = useState<GameMode>('daily');
   const [answer, setAnswer] = useState<Skill>(() => dailySkill());
   const [guesses, setGuesses] = useState<GradedGuess[]>(() =>
-    restoreDailyGuesses(skillById),
+    initialDailyProgress.guessedSkillIds.map((id) =>
+      gradeGuess(skillById.get(id)!, dailySkill()),
+    ),
   );
+  const [gaveUp, setGaveUp] = useState(initialDailyProgress.gaveUp);
   const [input, setInput] = useState('');
   const [message, setMessage] = useState('');
 
@@ -172,40 +208,43 @@ export default function App() {
     );
   }, []);
 
-    const librarySkills = useMemo(() => {
-  return [...skills]
-    .filter((skill) => professionName(skill) === selectedProfession)
-    .sort((first, second) =>
-      first.name.localeCompare(second.name, undefined, {
-        sensitivity: 'base',
-      }),
-    );
-}, [selectedProfession]);
+  const librarySkills = useMemo(() => {
+    return [...skills]
+      .filter((skill) => professionName(skill) === selectedProfession)
+      .sort((first, second) =>
+        first.name.localeCompare(second.name, undefined, {
+          sensitivity: 'base',
+        }),
+      );
+  }, [selectedProfession]);
 
   const won = guesses.some((guess) => guess.skill.id === answer.id);
-  const lost = guesses.length >= MAX_GUESSES && !won;
-  const gameOver = won || lost;
+  const gameOver = won || gaveUp;
 
   useEffect(() => {
-  if (mode !== 'daily') {
-    return;
-  }
+    if (mode !== 'daily') {
+      return;
+    }
 
-  const guessedSkillIds = guesses.map((guess) => guess.skill.id);
+    const progress: DailyProgress = {
+      guessedSkillIds: guesses.map((guess) => guess.skill.id),
+      gaveUp,
+    };
 
-  try {
-    window.localStorage.setItem(
-      dailyStorageKey(),
-      JSON.stringify(guessedSkillIds),
-    );
-  } catch {
-    // The game still works if browser storage is unavailable.
-  }
-}, [guesses, mode]);
+    try {
+      window.localStorage.setItem(
+        dailyStorageKey(),
+        JSON.stringify(progress),
+      );
+    } catch {
+      // The game still works if browser storage is unavailable.
+    }
+  }, [gaveUp, guesses, mode]);
 
   function resetRound(nextMode = mode) {
     setAnswer(answerForMode(nextMode));
     setGuesses([]);
+    setGaveUp(false);
     setInput('');
     setMessage('');
   }
@@ -220,42 +259,28 @@ export default function App() {
     setMessage('');
 
     if (nextMode === 'daily') {
-      const savedProgress = window.localStorage.getItem(dailyStorageKey());
+      const dailyProgress = restoreDailyProgress(skillById);
 
-      if (!savedProgress) {
-        setAnswer(dailySkill());
-        setGuesses([]);
-        return;
-      }
-
-      try {
-        const savedSkillIds: unknown = JSON.parse(savedProgress);
-
-        if (!Array.isArray(savedSkillIds)) {
-          setAnswer(dailySkill());
-          setGuesses([]);
-          return;
-        }
-
-        const restoredGuesses = savedSkillIds
-          .filter((id): id is number => typeof id === 'number')
-          .map((id) => skillById.get(id))
-          .filter((skill): skill is Skill => skill !== undefined)
-          .slice(0, MAX_GUESSES)
-          .map((skill) => gradeGuess(skill, dailySkill()));
-
-        setAnswer(dailySkill());
-        setGuesses(restoredGuesses);
-      } catch {
-        setAnswer(dailySkill());
-        setGuesses([]);
-      }
+      setAnswer(dailySkill());
+      setGuesses(
+        dailyProgress.guessedSkillIds.map((id) =>
+          gradeGuess(skillById.get(id)!, dailySkill()),
+        ),
+      );
+      setGaveUp(dailyProgress.gaveUp);
 
       return;
     }
 
     setAnswer(randomSkill());
     setGuesses([]);
+    setGaveUp(false);
+  }
+
+  function giveUp() {
+    setGaveUp(true);
+    setInput('');
+    setMessage('');
   }
 
   function submitGuess(event: FormEvent<HTMLFormElement>) {
@@ -291,6 +316,7 @@ export default function App() {
     window.localStorage.removeItem(dailyStorageKey());
     setAnswer(dailySkill());
     setGuesses([]);
+    setGaveUp(false);
     setInput('');
     setMessage('');
   }
@@ -300,9 +326,13 @@ export default function App() {
       <header className="page-header">
         <h1>GW Skilldle</h1>
 
+        <p className="fan-project-notice">
+          Unofficial, non-commercial Guild Wars fan project. Not affiliated with,
+          endorsed by, sponsored by, or approved by ArenaNet or NCSOFT.
+        </p>
+
         <p>
-          Guess {mode === 'daily' ? 'today’s' : 'a'} Guild Wars skill in{' '}
-          {MAX_GUESSES} attempts.
+          Guess {mode === 'daily' ? 'today’s' : 'a'} Guild Wars skill.
         </p>
 
         <div className="mode-switcher" aria-label="Game mode">
@@ -417,20 +447,6 @@ export default function App() {
           </div>
         ))}
 
-        {Array.from({ length: MAX_GUESSES - guesses.length }).map((_, index) => (
-          <div className="board-row empty-row" key={`empty-${index}`}>
-            <div />
-            <div />
-            <div />
-            <div />
-            <div />
-            <div />
-            <div />
-            <div />
-            <div />
-            <div />
-          </div>
-        ))}
       </section>
 
       {!gameOver && (
@@ -456,13 +472,21 @@ export default function App() {
             <button type="submit">Guess</button>
           </div>
 
+          <button
+            type="button"
+            className="give-up-button"
+            onClick={giveUp}
+          >
+            I have no idea — give me the answer, please
+          </button>
+
           {message && <p className="message">{message}</p>}
         </form>
       )}
 
       {gameOver && (
         <section className={`game-over ${won ? 'won' : 'lost'}`}>
-          <h2>{won ? 'Solved!' : 'Out of guesses'}</h2>
+          <h2>{won ? 'Solved!' : 'The Mists have claimed another hero.'}</h2>
 
           <div className="revealed-answer">
             <img
@@ -494,7 +518,7 @@ export default function App() {
         </section>
       )}
 
-            <section className="skill-library" aria-labelledby="skill-library-title">
+      <section className="skill-library" aria-labelledby="skill-library-title">
         <div className="library-heading">
           <div>
             <h2 id="skill-library-title">Skill Library</h2>
@@ -548,17 +572,17 @@ export default function App() {
                       alt=""
                       aria-hidden="true"
                       loading="lazy"
-                      //  onError={(event) => {
-                      //   event.currentTarget.style.display = 'none';
-                      // }} 
+                    //  onError={(event) => {
+                    //   event.currentTarget.style.display = 'none';
+                    // }} 
                     />
 
                     <div className="library-skill-name">
                       {skill.name}
 
-                      {skill.elite && (
+                      {/* {skill.elite && (
                         <span className="elite-tag">Elite</span>
-                      )}
+                      )} */}
                     </div>
                   </div>
 
@@ -587,6 +611,29 @@ export default function App() {
           </div>
         )}
       </section>
+
+      <footer className="site-footer">
+        <p>
+          GW Skilldle is an unofficial, non-commercial fan project. It is not
+          affiliated with, endorsed by, sponsored by, or approved by ArenaNet
+          LLC, NCSOFT Corporation, or their affiliates.
+        </p>
+
+        <p>
+          Feedback, bug reports, or rights concerns:{' '}
+          <a href="mailto:esulsoftware@gmail.com">esulsoftware@gmail.com</a>
+        </p>
+
+        <p>
+          Guild Wars Games © ArenaNet LLC. All rights reserved.
+          <br />
+          NCSOFT, ArenaNet, Guild Wars, Guild Wars Factions, Guild Wars
+          Nightfall, Guild Wars: Eye of the North, and all associated logos
+          and designs are trademarks or registered trademarks of NCSOFT
+          Corporation. All other trademarks are the property of their
+          respective owners.
+        </p>
+      </footer>
     </main>
   );
 }
