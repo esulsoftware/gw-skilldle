@@ -5,8 +5,6 @@ import {
   campaignName,
   dailyDateKey,
   dailySkill,
-  isPveSkill,
-  isRankBasedPveSkill,
   professionName,
   randomSkill,
   skills,
@@ -21,22 +19,11 @@ import {
   type GradedGuess,
   type Result,
 } from './lib/compare';
+import { skillIconPath, wikiUrl } from './lib/skillLinks';
+import SkillLibrary from './components/SkillLibrary';
 import './App.css';
 
 const DAILY_STORAGE_PREFIX = 'gw-skilldle-daily-v3';
-const LIBRARY_FILTERS = [
-  'Warrior',
-  'Ranger',
-  'Monk',
-  'Necromancer',
-  'Mesmer',
-  'Elementalist',
-  'Assassin',
-  'Ritualist',
-  'Paragon',
-  'Dervish',
-  'PvE',
-] as const;
 
 type GameMode = 'daily' | 'practice';
 
@@ -59,14 +46,6 @@ function formatNumber(value: number | null, suffix = ''): string {
 
 function formatEnergy(skill: Skill): string {
   return String(energyCost(skill));
-}
-
-function skillIconPath(skill: Skill): string {
-  return `/skill-icons/${skill.id}.png`;
-}
-
-function wikiUrl(skill: Skill): string {
-  return `https://wiki.guildwars.com/wiki/${encodeURIComponent(skill.name)}`;
 }
 
 function ResultArrow({
@@ -143,10 +122,6 @@ export default function App() {
   const [gaveUp, setGaveUp] = useState(initialDailyProgress.gaveUp);
   const [input, setInput] = useState('');
   const [message, setMessage] = useState('');
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [selectedLibraryFilter, setSelectedLibraryFilter] = useState<
-    (typeof LIBRARY_FILTERS)[number]
-  >('Warrior');
 
   const skillByNormalizedName = useMemo(
     () =>
@@ -158,21 +133,6 @@ export default function App() {
       ),
     [],
   );
-
-  const librarySkills = useMemo(() => {
-  const matchingSkills =
-    selectedLibraryFilter === 'PvE'
-      ? skills.filter(isRankBasedPveSkill)
-      : skills.filter(
-          (skill) => professionName(skill) === selectedLibraryFilter,
-        );
-
-  return [...matchingSkills].sort((first, second) =>
-    first.name.localeCompare(second.name, undefined, {
-      sensitivity: 'base',
-    }),
-  );
-}, [selectedLibraryFilter]);
 
   const guessedSkillIdSet = useMemo(
     () => new Set(guesses.map((guess) => guess.skill.id)),
@@ -544,89 +504,7 @@ export default function App() {
         </section>
       )}
 
-      <section className="skill-library" aria-labelledby="skill-library-title">
-        <div className="library-heading">
-          <div>
-            <h2 id="skill-library-title">Skill Library</h2>
-            <p>Browse skills by profession without affecting your game.</p>
-          </div>
-
-          <button
-            type="button"
-            className="library-toggle"
-            onClick={() => setLibraryOpen((isOpen) => !isOpen)}
-            aria-expanded={libraryOpen}
-            aria-controls="skill-library-content"
-          >
-            {libraryOpen ? 'Hide skills' : 'Browse skills'}
-          </button>
-        </div>
-
-        {libraryOpen && (
-          <div id="skill-library-content" className="library-content">
-            <div
-              className="profession-filters"
-              aria-label="Filter skill library by profession"
-            >
-              {LIBRARY_FILTERS.map((filter) => (
-                <button
-                  key={filter}
-                  type="button"
-                  className={
-                    selectedLibraryFilter === filter
-                      ? 'profession-button active'
-                      : 'profession-button'
-                  }
-                  onClick={() => setSelectedLibraryFilter(filter)}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-
-            <p className="library-count">
-              {librarySkills.length} {selectedLibraryFilter} skills
-            </p>
-
-            <ul className="skill-list">
-              {librarySkills.map((skill) => (
-                <li key={skill.id} className="skill-list-item">
-                  <div className="library-skill-top">
-                    <img
-                      className="skill-icon"
-                      src={skillIconPath(skill)}
-                      alt=""
-                      aria-hidden="true"
-                      loading="lazy"
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none';
-                      }}
-                    />
-
-                    <div className="library-skill-heading">
-                      <a
-                        className="library-skill-name wiki-skill-name"
-                        href={wikiUrl(skill)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {skill.name}
-                      </a>
-                      {isPveSkill(skill) && <span className="pve-tag">PvE</span>}
-                    </div>
-                  </div>
-
-                  {skill.description && (
-                    <p className="library-skill-description">
-                      {skill.description}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+      <SkillLibrary />
 
       <footer className="site-footer">
         <p>
