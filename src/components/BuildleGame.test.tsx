@@ -629,3 +629,144 @@ describe('guess numbering', () => {
     expect(numbers()).toEqual(['#1Guess 1: ']);
   });
 });
+
+describe('pinned guess area (same as Skilldle’s)', () => {
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+  const originalMatchMedia = window.matchMedia;
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    window.matchMedia = originalMatchMedia;
+  });
+
+  const form = () => document.querySelector('form.guess-form') as HTMLFormElement | null;
+
+  /** Puts the skill bar above or inside the viewport, as scrolling would. */
+  function barTop(top: number) {
+    vi.spyOn(bar(), 'getBoundingClientRect').mockReturnValue({ top } as DOMRect);
+  }
+
+  function trackScrolling(reducedMotion = false) {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+    window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion }) as unknown as typeof window.matchMedia;
+    return scrollIntoView;
+  }
+
+  it('uses Skilldle’s pinned form, after the game section, with the same controls', () => {
+    renderGame();
+    const section = document.querySelector('.buildle-game')!;
+    const pinned = form()!;
+
+    expect(pinned.className).toBe('guess-form');
+    expect(section.contains(pinned)).toBe(false);
+    expect(section.compareDocumentPosition(pinned) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const library = screen.getByRole('heading', { name: 'Skill Library' }).closest('section')!;
+    expect(pinned.compareDocumentPosition(library) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const inForm = within(pinned);
+    expect(inForm.getByLabelText('Your guess')).toBeTruthy();
+    expect(inForm.getByRole('button', { name: 'Guess' })).toBeTruthy();
+    expect(inForm.getByRole('button', { name: 'Give up / show answer' })).toBeTruthy();
+    expect(pinned.querySelector('.message[aria-live="polite"]')).toBeTruthy();
+    // The suggestions list lives inside the pinned form, as in Skilldle.
+    expect(pinned.contains(document.getElementById('buildle-skill-input-suggestions'))).toBe(true);
+  });
+
+  it('keeps the guess confirmation and messages inside the pinned form', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Not a skill');
+    expect(within(form()!).getByText('Choose a valid skill from the suggestions.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Give up / show answer' }));
+    expect(within(form()!).getByRole('button', { name: 'Keep playing' })).toBeTruthy();
+  });
+
+  it('leaves no pinned form once the round ends, and shows the result normally', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Chilblains');
+    expect(form()).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Solved!' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Play Infinite' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Play Infinite' }));
+    expect(form()).not.toBeNull();
+    await giveUp(user);
+    expect(form()).toBeNull();
+    expect(screen.getByRole('button', { name: 'Next puzzle' })).toBeTruthy();
+  });
+
+  it('shows no pinned form for a withdrawn or not-yet-started Daily', () => {
+    fixture.withdrawals.withdrawals.push({
+      catalogRevision: 1,
+      puzzleKey: 'grawl-fixture:144',
+      withdrawnOn: '2026-11-16',
+      reason: 'r',
+      correction: 'c',
+    });
+    renderGame();
+    expect(form()).toBeNull();
+    cleanup();
+
+    fixture.withdrawals.withdrawals.length = 0;
+    vi.setSystemTime(new Date('2026-11-15T12:00:00Z'));
+    renderGame();
+    expect(form()).toBeNull();
+  });
+
+  it('after an accepted guess, scrolls the skill bar back into view if it is above the screen', async () => {
+    const scrollIntoView = trackScrolling();
+    const { user } = renderGame();
+    barTop(-300);
+
+    await guess(user, 'Life Siphon');
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(scrollIntoView.mock.contexts[0]).toBe(bar());
+
+    await guess(user, 'Chilblains'); // the winning guess returns to the bar too
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not move the page for invalid, duplicate, or rejected NM guesses', async () => {
+    const scrollIntoView = trackScrolling();
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    barTop(-300);
+    scrollIntoView.mockClear();
+
+    await guess(user, 'Not a skill');
+    await guess(user, 'Life Siphon');
+    await mode(user, 'NM');
+    barTop(-300);
+    await guess(user, 'Life Siphon');
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('does not scroll when the skill bar is already on screen', async () => {
+    const scrollIntoView = trackScrolling();
+    const { user } = renderGame();
+    barTop(40);
+    await guess(user, 'Life Siphon');
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('jumps without animation when the player prefers reduced motion', async () => {
+    const scrollIntoView = trackScrolling(true);
+    const { user } = renderGame();
+    barTop(-300);
+    await guess(user, 'Life Siphon');
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
+  });
+
+  it('scrolling the page keeps focus and typed text', async () => {
+    const { user } = renderGame();
+    await user.click(guessInput());
+    await user.keyboard('Fire');
+    fireEvent.scroll(window);
+    expect(document.activeElement).toBe(guessInput());
+    expect(guessInput().value).toBe('Fire');
+  });
+});

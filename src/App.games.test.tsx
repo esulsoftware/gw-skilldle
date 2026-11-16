@@ -362,3 +362,40 @@ describe('two Skill Libraries (Skilldle and Buildle)', () => {
     expect(window.scrollTo).not.toHaveBeenCalled();
   });
 });
+
+describe('pinned guess areas', () => {
+  const pinnedForms = () => [...document.querySelectorAll('form.guess-form')];
+  const visible = (element: Element) => !element.closest('[hidden]');
+
+  it('only the active game’s pinned guess area is visible and reachable', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(pinnedForms().filter(visible)).toHaveLength(1);
+
+    await openBuildle(user);
+    const shown = pinnedForms().filter(visible);
+    expect(shown).toHaveLength(1);
+    expect(shown[0].querySelector('#buildle-skill-input')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Guess' })).toHaveLength(1);
+
+    await user.click(gameButton('Skilldle'));
+    const back = pinnedForms().filter(visible);
+    expect(back).toHaveLength(1);
+    expect(back[0].querySelector('#skill-input')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Guess' })).toHaveLength(1);
+  });
+
+  it('switching games keeps each pinned area’s typed text', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    fireEvent.change(guessInput(), { target: { value: 'Skilldle draft' } });
+    await openBuildle(user);
+    const buildleInput = document.getElementById('buildle-skill-input') as HTMLInputElement;
+    fireEvent.change(buildleInput, { target: { value: 'Buildle draft' } });
+
+    await user.click(gameButton('Skilldle'));
+    expect(guessInput().value).toBe('Skilldle draft');
+    await user.click(gameButton('Buildle'));
+    expect((document.getElementById('buildle-skill-input') as HTMLInputElement).value).toBe('Buildle draft');
+  });
+});

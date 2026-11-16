@@ -1087,9 +1087,9 @@ h1 {
   background: #2b1714;
 }
 
-.buildle-give-up {
+/* The give-up confirmation sits where the give-up button was. */
+.guess-form .buildle-confirm {
   margin-top: 0.75rem;
-  text-align: center;
 }
 
 .buildle-confirm {
@@ -1132,11 +1132,6 @@ h1 {
 .buildle-hint-note {
   color: #b9a98e;
   font-size: 0.9rem;
-}
-
-/* Buildle's guess bar stays in the flow (not pinned like Skilldle's). */
-.guess-form.buildle-form {
-  position: static;
 }
 
 .buildle-guesses ol {

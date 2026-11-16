@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   HINT_AFTER_INCORRECT,
   buildSlots,
@@ -133,6 +133,7 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
   }));
   const [message, setMessage] = useState('');
   const [confirmingGiveUp, setConfirmingGiveUp] = useState(false);
+  const barRef = useRef<HTMLOListElement>(null);
 
   const roundKey: RoundKey = `${playMode}-${difficulty}`;
   const round = rounds[roundKey]!;
@@ -239,6 +240,32 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
       input: '',
     });
     setConfirmingGiveUp(false);
+    returnToBar();
+  }
+
+  /**
+   * As Skilldle does after an accepted guess: if the skill bar has scrolled
+   * above the viewport, bring it back so the result is visible. Rejected
+   * submissions never get here, so they never move the page.
+   */
+  function returnToBar() {
+    const barIsAboveViewport =
+      barRef.current !== null && barRef.current.getBoundingClientRect().top < 0;
+
+    if (!barIsAboveViewport) {
+      return;
+    }
+
+    const reduceMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    window.requestAnimationFrame(() => {
+      barRef.current?.scrollIntoView({
+        behavior: reduceMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    });
   }
 
   function giveUp() {
@@ -346,7 +373,7 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
         </div>
       ) : (
         <>
-          <ol className="buildle-bar" aria-label="Boss skill bar">
+          <ol ref={barRef} className="buildle-bar" aria-label="Boss skill bar">
             {slots.map((slot, index) => (
               <li
                 key={index}
@@ -425,57 +452,7 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
             </div>
           )}
 
-          <p className="message" aria-live="polite">
-            {message}
-          </p>
-
-          {playing ? (
-            <>
-              <form className="guess-form buildle-form" onSubmit={submitGuess}>
-                <label htmlFor="buildle-skill-input">Your guess</label>
-                <div className="guess-controls">
-                  <SkillCombobox
-                    key={`${roundKey}-${round.id}`}
-                    inputId="buildle-skill-input"
-                    skills={availableSkills}
-                    value={round.input}
-                    onChange={(input) => updateRound({ input })}
-                    placeholder={
-                      isNm
-                        ? 'Start typing an elite Guild Wars skill...'
-                        : 'Start typing a Guild Wars skill...'
-                    }
-                  />
-                  <button type="submit">Guess</button>
-                </div>
-              </form>
-
-              <div className="buildle-give-up">
-                {confirmingGiveUp ? (
-                  <div className="buildle-confirm" role="group" aria-labelledby="buildle-confirm-text">
-                    <p id="buildle-confirm-text">
-                      Give up and show the answer? This ends the round
-                      {isDaily ? ' and today’s Daily cannot be replayed' : ''}.
-                    </p>
-                    <button type="button" onClick={giveUp}>
-                      Yes, show the answer
-                    </button>
-                    <button type="button" onClick={() => setConfirmingGiveUp(false)}>
-                      Keep playing
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="give-up-button"
-                    onClick={() => setConfirmingGiveUp(true)}
-                  >
-                    Give up / show answer
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
+          {!playing && (
             <section
               className={`game-over ${status === 'solved' ? 'won' : 'lost'}`}
               aria-labelledby="buildle-result-title"
@@ -570,6 +547,59 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
 
       <p className="buildle-attribution">{buildleAttribution}</p>
     </section>
+
+    {/* Pinned guess area, the same element and styles as Skilldle's: it
+        follows the game in the page and sticks to the top while scrolling.
+        It only exists while a round is being played. */}
+    {playing && (
+      <form className="guess-form" onSubmit={submitGuess}>
+        <label htmlFor="buildle-skill-input">Your guess</label>
+
+        <div className="guess-controls">
+          <SkillCombobox
+            key={`${roundKey}-${round.id}`}
+            inputId="buildle-skill-input"
+            skills={availableSkills}
+            value={round.input}
+            onChange={(input) => updateRound({ input })}
+            placeholder={
+              isNm
+                ? 'Start typing an elite Guild Wars skill...'
+                : 'Start typing a Guild Wars skill...'
+            }
+          />
+
+          <button type="submit">Guess</button>
+        </div>
+
+        {confirmingGiveUp ? (
+          <div className="buildle-confirm" role="group" aria-labelledby="buildle-confirm-text">
+            <p id="buildle-confirm-text">
+              Give up and show the answer? This ends the round
+              {isDaily ? ' and today’s Daily cannot be replayed' : ''}.
+            </p>
+            <button type="button" onClick={giveUp}>
+              Yes, show the answer
+            </button>
+            <button type="button" onClick={() => setConfirmingGiveUp(false)}>
+              Keep playing
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="give-up-button"
+            onClick={() => setConfirmingGiveUp(true)}
+          >
+            Give up / show answer
+          </button>
+        )}
+
+        <p className="message" aria-live="polite">
+          {message}
+        </p>
+      </form>
+    )}
 
     {/* The shared Skill Library, below the game as in Skilldle. Browsing
         only: it follows Buildle's difficulty (NM: elite-only by default) but
