@@ -843,3 +843,42 @@ describe('give up returns to the revealed answer', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('solve titles', () => {
+  it('a first-guess solve shows "Champion of the Gods" in the solved banner', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Chilblains');
+
+    const banner = screen.getByRole('heading', { name: 'Solved!' }).closest('section')!;
+    expect(banner.querySelector('.solve-title')?.textContent).toBe('Title: Champion of the Gods');
+  });
+
+  it('counts accepted guesses only: two wrong, one invalid, then a solve is "Flameseeker"', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    await guess(user, 'Not a skill');
+    await guess(user, 'Fireball');
+    await guess(user, 'Chilblains');
+
+    expect(screen.getByText('Solved in 3 guesses.')).toBeTruthy();
+    expect(document.querySelector('.solve-title')?.textContent).toBe('Title: Flameseeker');
+  });
+
+  it('the title is kept when a solved Daily is restored after a refresh', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    await guess(user, 'Chilblains');
+
+    refresh();
+    expect(document.querySelector('.solve-title')?.textContent).toBe('Title: Legend of the Mists');
+  });
+
+  it('giving up shows no title', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    await giveUp(user);
+
+    expect(screen.getByRole('heading', { name: 'You gave up.' })).toBeTruthy();
+    expect(document.querySelector('.solve-title')).toBeNull();
+  });
+});

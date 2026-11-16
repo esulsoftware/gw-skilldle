@@ -24,6 +24,7 @@ import { skillIconPath, wikiUrl } from '../lib/skillLinks';
 import SkillCombobox from './SkillCombobox';
 import SkillLibrary from './SkillLibrary';
 import { scrollToElement } from '../lib/scrolling';
+import { solveTitle } from '../lib/titles';
 
 type RoundKey = `${PlayMode}-${Difficulty}`;
 
@@ -468,9 +469,15 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
                 {status === 'solved' ? 'Solved!' : 'You gave up.'}
               </h3>
               {status === 'solved' && (
-                <p className="buildle-solved-count">
-                  Solved in {guessIds.length} {guessIds.length === 1 ? 'guess' : 'guesses'}.
-                </p>
+                <>
+                  <p className="solve-title">
+                    Title:{' '}
+                    <strong>{solveTitle({ solved: true, guessCount: guessIds.length })}</strong>
+                  </p>
+                  <p className="buildle-solved-count">
+                    Solved in {guessIds.length} {guessIds.length === 1 ? 'guess' : 'guesses'}.
+                  </p>
+                </>
               )}
               <p>
                 The missing skill was <strong>{skillFor(puzzle.targetId).name}</strong>, from{' '}

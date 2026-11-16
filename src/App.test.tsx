@@ -608,3 +608,32 @@ describe('giving up returns to the revealed answer', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('solve titles', () => {
+  it('a first-guess solve shows "Champion of the Gods" in the solved banner', async () => {
+    const user = renderApp();
+    await guess(user, hmAnswer.name);
+
+    const banner = screen.getByRole('heading', { name: 'Solved!' }).closest('section')!;
+    expect(banner.querySelector('.solve-title')?.textContent).toBe('Title: Champion of the Gods');
+  });
+
+  it('counts only accepted guesses: two wrong guesses and an invalid one, then a solve, is "Flameseeker"', async () => {
+    const user = renderApp();
+    await guess(user, hmWrongGuesses[0].name);
+    await guess(user, 'Not a skill');
+    await guess(user, hmWrongGuesses[1].name);
+    await guess(user, hmAnswer.name);
+
+    expect(document.querySelector('.solve-title')?.textContent).toBe('Title: Flameseeker');
+  });
+
+  it('giving up shows no title', async () => {
+    const user = renderApp();
+    await guess(user, hmWrongGuesses[0].name);
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+
+    expect(screen.getByRole('heading', { name: 'The Mists have claimed another hero.' })).toBeTruthy();
+    expect(document.querySelector('.solve-title')).toBeNull();
+  });
+});
