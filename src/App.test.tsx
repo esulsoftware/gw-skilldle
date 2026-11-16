@@ -44,6 +44,32 @@ async function guess(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('button', { name: 'Guess' }));
 }
 
+/** Opens suggestions on the empty guess input and returns how many are eligible. */
+async function suggestionTotal(user: ReturnType<typeof userEvent.setup>) {
+  const input = screen.getByRole('combobox', { name: 'Your guess' });
+  await user.click(input);
+  await user.keyboard('{ArrowDown}');
+  const status = screen.getByRole('status').textContent ?? '';
+  const shown = screen.getAllByRole('option').map((option) => option.textContent);
+  await user.keyboard('{Escape}');
+  const total = Number(/of (\d+) matches|^(\d+) matching/.exec(status)?.slice(1).find(Boolean));
+  return { total, shown };
+}
+
+async function suggestionsFor(
+  user: ReturnType<typeof userEvent.setup>,
+  text: string,
+) {
+  const input = screen.getByRole('combobox', { name: 'Your guess' });
+  fireEvent.change(input, { target: { value: '' } });
+  await user.type(input, text);
+  const shown = screen.queryAllByRole('option').map((option) => option.textContent);
+  const status = screen.getByRole('status').textContent;
+  await user.keyboard('{Escape}');
+  fireEvent.change(input, { target: { value: '' } });
+  return { shown, status };
+}
+
 function guessRows() {
   return screen.queryAllByLabelText(/^Guess \d+$/);
 }
@@ -172,13 +198,14 @@ describe('NM guesses', () => {
     const user = renderApp();
     await user.click(screen.getByRole('button', { name: 'NM' }));
 
-    const options = [
-      ...document.querySelectorAll<HTMLOptionElement>('#skill-options option'),
-    ].map((option) => option.value);
+    const { total, shown } = await suggestionTotal(user);
     const eliteNames = new Set(eliteSkills.map((skill) => skill.name));
 
-    expect(options).toHaveLength(eliteSkills.length);
-    expect(options.every((name) => eliteNames.has(name))).toBe(true);
+    expect(total).toBe(eliteSkills.length);
+    expect(shown.every((name) => eliteNames.has(name!))).toBe(true);
+    expect((await suggestionsFor(user, nonElite.name)).status).toBe(
+      'No matching skills',
+    );
   });
 
   it('rejects non-elite and invalid guesses without counting them', async () => {
@@ -363,16 +390,89 @@ describe('NM Skill Library filter', () => {
     await openLibrary(user);
     expect(libraryNames()).toContain(warriorNonElite.name);
 
-    const options = [
-      ...document.querySelectorAll<HTMLOptionElement>('#skill-options option'),
-    ];
-    expect(options).toHaveLength(eliteSkills.length);
+    expect((await suggestionTotal(user)).total).toBe(eliteSkills.length);
+    expect((await suggestionsFor(user, warriorNonElite.name)).status).toBe(
+      'No matching skills',
+    );
 
     await guess(user, warriorNonElite.name);
     expect(
       screen.getByText('Skilldle NM only accepts elite skills.'),
     ).toBeTruthy();
     expect(guessRows()).toHaveLength(0);
+  });
+});
+
+describe('guess autocomplete', () => {
+  const guessInput = () =>
+    screen.getByRole('combobox', { name: 'Your guess' }) as HTMLInputElement;
+
+  it('choosing a suggestion fills the name; a separate Enter submits the guess', async () => {
+    const user = renderApp();
+    const target = hmWrongGuesses.find((skill) => /^[A-Za-z ]+$/.test(skill.name))!;
+
+    await user.type(guessInput(), target.name.toLowerCase());
+    const position = screen
+      .getAllByRole('option')
+      .findIndex((option) => option.textContent === target.name);
+    await user.keyboard('{ArrowDown}'.repeat(position + 1) + '{Enter}');
+
+    expect(guessInput().value).toBe(target.name);
+    expect(guessRows()).toHaveLength(0);
+
+    await user.keyboard('{Enter}');
+    expect(guessRows()).toHaveLength(1);
+    expect(screen.getByRole('link', { name: target.name })).toBeTruthy();
+    expect(guessInput().value).toBe('');
+    expect(guessInput().getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('removes already-guessed skills from suggestions', async () => {
+    const user = renderApp();
+    const target = hmWrongGuesses[0];
+    const before = await suggestionTotal(user);
+
+    await guess(user, target.name);
+    expect(guessRows()).toHaveLength(1);
+    expect((await suggestionTotal(user)).total).toBe(before.total - 1);
+    expect((await suggestionsFor(user, target.name)).shown).not.toContain(
+      target.name,
+    );
+
+    // Typing it anyway is still rejected as a duplicate.
+    await guess(user, target.name);
+    expect(screen.getByText('You already guessed that skill.')).toBeTruthy();
+    expect(guessRows()).toHaveLength(1);
+  });
+
+  it('HM suggestions use the full eligible pool', async () => {
+    const user = renderApp();
+    expect((await suggestionTotal(user)).total).toBe(skills.length);
+    expect((await suggestionsFor(user, nonElite.name)).shown).toContain(
+      nonElite.name,
+    );
+  });
+
+  it('switching modes closes and resets open suggestions', async () => {
+    const user = renderApp();
+    await user.type(guessInput(), 'sand');
+    await user.keyboard('{ArrowDown}');
+    expect(guessInput().getAttribute('aria-expanded')).toBe('true');
+
+    // A plain click, so the input is not blurred first.
+    fireEvent.click(screen.getByRole('button', { name: 'NM' }));
+    expect(guessInput().value).toBe('');
+    expect(guessInput().getAttribute('aria-expanded')).toBe('false');
+    expect(guessInput().hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
+  it('ending the game removes the suggestions', async () => {
+    const user = renderApp();
+    await user.type(guessInput(), 'sand');
+    fireEvent.click(screen.getByRole('button', { name: /give me the answer/ }));
+
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('listbox', { hidden: true })).toBeNull();
   });
 });
 

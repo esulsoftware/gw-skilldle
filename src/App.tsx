@@ -28,6 +28,7 @@ import {
   type Result,
 } from './lib/compare';
 import { skillIconPath, wikiUrl } from './lib/skillLinks';
+import SkillCombobox from './components/SkillCombobox';
 import SkillLibrary from './components/SkillLibrary';
 import './App.css';
 
@@ -178,6 +179,8 @@ export default function App() {
   const [guesses, setGuesses] = useState<GradedGuess[]>(initialRound.guesses);
   const [gaveUp, setGaveUp] = useState(initialRound.gaveUp);
   const [input, setInput] = useState('');
+  // Changes whenever a new round is shown, so stale suggestions reset.
+  const [roundKey, setRoundKey] = useState(0);
   const [message, setMessage] = useState('');
 
   const skillByNormalizedName = useMemo(
@@ -228,6 +231,7 @@ export default function App() {
   }, [difficulty, gaveUp, guesses, playMode, puzzleDate]);
 
   function showRound(round: Round) {
+    setRoundKey((key) => key + 1);
     setPuzzleDate(round.puzzleDate);
     setAnswer(round.answer);
     setGuesses(round.guesses);
@@ -555,24 +559,18 @@ export default function App() {
           <label htmlFor="skill-input">Your guess</label>
 
           <div className="guess-controls">
-            <input
-              id="skill-input"
-              list="skill-options"
-              autoComplete="off"
+            <SkillCombobox
+              key={roundKey}
+              inputId="skill-input"
+              skills={availableSkills}
               value={input}
-              onChange={(event) => setInput(event.target.value)}
+              onChange={setInput}
               placeholder={
                 isNm
                   ? 'Start typing an elite Guild Wars skill...'
                   : 'Start typing a Guild Wars skill...'
               }
             />
-
-            <datalist id="skill-options">
-              {availableSkills.map((skill) => (
-                <option key={skill.id} value={skill.name} />
-              ))}
-            </datalist>
 
             <button type="submit">Guess</button>
           </div>
