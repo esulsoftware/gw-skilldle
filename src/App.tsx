@@ -629,7 +629,7 @@ export default function App() {
         </section>
       )}
 
-      <SkillLibrary />
+      <SkillLibrary nmMode={isNm} />
 
       <footer className="site-footer">
         <p>

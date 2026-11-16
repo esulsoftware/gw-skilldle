@@ -303,6 +303,79 @@ describe('midnight UTC', () => {
   });
 });
 
+describe('NM Skill Library filter', () => {
+  const CHECKBOX = 'Show non-elite skills';
+  const PREF_KEY = 'gw-skilldle-library-nm-show-non-elite';
+  const library = () =>
+    screen.getByRole('region', { name: 'Skill Library' });
+  const libraryNames = () =>
+    [...library().querySelectorAll('.library-skill-name')].map(
+      (link) => link.textContent,
+    );
+  const warriorNonElite = skills.find(
+    (skill) => skill.profession === 1 && !skill.elite,
+  )!;
+
+  async function openLibrary(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'Browse skills' }));
+  }
+
+  it('is shared by Daily NM and Infinite NM, hidden in HM, and restored after HM', async () => {
+    const user = renderApp();
+    await openLibrary(user);
+
+    // HM: no checkbox, full list.
+    expect(screen.queryByRole('checkbox', { name: CHECKBOX })).toBeNull();
+    expect(libraryNames()).toContain(warriorNonElite.name);
+
+    // Daily NM: elite-only by default.
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    expect(libraryNames()).not.toContain(warriorNonElite.name);
+
+    await user.click(screen.getByRole('checkbox', { name: CHECKBOX }));
+    expect(libraryNames()).toContain(warriorNonElite.name);
+
+    // Infinite NM shares the preference.
+    await user.click(screen.getByRole('button', { name: 'Infinite' }));
+    expect(
+      (screen.getByRole('checkbox', { name: CHECKBOX }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(libraryNames()).toContain(warriorNonElite.name);
+
+    // HM hides the checkbox and leaves the saved preference alone.
+    await user.click(screen.getByRole('button', { name: 'HM' }));
+    expect(screen.queryByRole('checkbox', { name: CHECKBOX })).toBeNull();
+    expect(window.localStorage.getItem(PREF_KEY)).toBe('true');
+
+    // Back to NM: the preference is restored.
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    expect(
+      (screen.getByRole('checkbox', { name: CHECKBOX }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+  });
+
+  it('showing non-elites in the library does not allow non-elite NM guesses', async () => {
+    window.localStorage.setItem(PREF_KEY, 'true');
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    await openLibrary(user);
+    expect(libraryNames()).toContain(warriorNonElite.name);
+
+    const options = [
+      ...document.querySelectorAll<HTMLOptionElement>('#skill-options option'),
+    ];
+    expect(options).toHaveLength(eliteSkills.length);
+
+    await guess(user, warriorNonElite.name);
+    expect(
+      screen.getByText('Skilldle NM only accepts elite skills.'),
+    ).toBeTruthy();
+    expect(guessRows()).toHaveLength(0);
+  });
+});
+
 describe('Infinite NM', () => {
   it('reveals an elite answer', async () => {
     const user = renderApp();

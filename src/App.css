@@ -732,3 +732,27 @@ h1 {
     minmax(85px, 0.8fr);
   min-width: 1010px;
 }
+
+/* NM Skill Library: "Show non-elite skills" */
+.non-elite-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  color: #d8ceb9;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.non-elite-toggle input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: #e5b75d;
+  cursor: pointer;
+}
+
+.library-empty {
+  margin: 1rem 0 0;
+  color: #d8ceb9;
+}

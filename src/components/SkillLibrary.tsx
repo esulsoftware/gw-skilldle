@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
   readLibraryView,
+  readShowNonElite,
   saveLibraryView,
+  saveShowNonElite,
   type LibraryView,
 } from '../lib/libraryView';
 import { skillIconPath, wikiUrl } from '../lib/skillLinks';
@@ -29,30 +31,48 @@ const LIBRARY_FILTERS = [
 
 type LibraryFilter = (typeof LIBRARY_FILTERS)[number];
 
-export default function SkillLibrary() {
+type SkillLibraryProps = {
+  /**
+   * True in Skilldle NM: the library offers the "Show non-elite skills"
+   * checkbox and, while it is unchecked, lists elite skills only.
+   */
+  nmMode?: boolean;
+};
+
+export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [selectedLibraryFilter, setSelectedLibraryFilter] =
     useState<LibraryFilter>('Warrior');
   const [view, setView] = useState<LibraryView>(readLibraryView);
+  // Kept while in HM (where it is ignored), so returning to NM restores it.
+  const [showNonElite, setShowNonElite] = useState(readShowNonElite);
+
+  const eliteOnly = nmMode && !showNonElite;
 
   const librarySkills = useMemo(() => {
-    const matchingSkills =
+    const matchingSkills = (
       selectedLibraryFilter === 'PvE'
         ? skills.filter(isRankBasedPveSkill)
         : skills.filter(
             (skill) => professionName(skill) === selectedLibraryFilter,
-          );
+          )
+    ).filter((skill) => !eliteOnly || skill.elite);
 
     return [...matchingSkills].sort((first, second) =>
       first.name.localeCompare(second.name, undefined, {
         sensitivity: 'base',
       }),
     );
-  }, [selectedLibraryFilter]);
+  }, [eliteOnly, selectedLibraryFilter]);
 
   function changeView(nextView: LibraryView) {
     setView(nextView);
     saveLibraryView(nextView);
+  }
+
+  function changeShowNonElite(nextShowNonElite: boolean) {
+    setShowNonElite(nextShowNonElite);
+    saveShowNonElite(nextShowNonElite);
   }
 
   return (
@@ -98,8 +118,22 @@ export default function SkillLibrary() {
 
           <div className="library-toolbar">
             <p className="library-count">
-              {librarySkills.length} {selectedLibraryFilter} skills
+              {librarySkills.length} {eliteOnly ? 'elite ' : ''}
+              {selectedLibraryFilter} skills
             </p>
+
+            {nmMode && (
+              <label className="non-elite-toggle">
+                <input
+                  type="checkbox"
+                  checked={showNonElite}
+                  onChange={(event) =>
+                    changeShowNonElite(event.target.checked)
+                  }
+                />
+                Show non-elite skills
+              </label>
+            )}
 
             <div className="view-toggle" role="group" aria-label="Library view">
               <button
@@ -121,10 +155,16 @@ export default function SkillLibrary() {
             </div>
           </div>
 
-          {view === 'grid' ? (
-            // Keyed by filter so a new filter starts with fresh focus/details.
+          {librarySkills.length === 0 ? (
+            <p className="library-empty">
+              No elite {selectedLibraryFilter} skills. Check “Show non-elite
+              skills” to browse the rest of this category.
+            </p>
+          ) : view === 'grid' ? (
+            // Keyed by the visible list, so a filter or elite-only change
+            // starts with fresh details and a valid keyboard Tab stop.
             <SkillGrid
-              key={selectedLibraryFilter}
+              key={`${selectedLibraryFilter}:${eliteOnly ? 'elite' : 'all'}`}
               skills={librarySkills}
               label={`${selectedLibraryFilter} skills`}
             />
