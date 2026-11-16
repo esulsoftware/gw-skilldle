@@ -50,7 +50,7 @@ async function suggestionTotal(user: ReturnType<typeof userEvent.setup>) {
   await user.click(input);
   await user.keyboard('{ArrowDown}');
   const status = screen.getByRole('status').textContent ?? '';
-  const shown = screen.getAllByRole('option').map((option) => option.textContent);
+  const shown = suggestionOptions().map((option) => option.textContent);
   await user.keyboard('{Escape}');
   const total = Number(/of (\d+) matches|^(\d+) matching/.exec(status)?.slice(1).find(Boolean));
   return { total, shown };
@@ -63,11 +63,18 @@ async function suggestionsFor(
   const input = screen.getByRole('combobox', { name: 'Your guess' });
   fireEvent.change(input, { target: { value: '' } });
   await user.type(input, text);
-  const shown = screen.queryAllByRole('option').map((option) => option.textContent);
+  const shown = suggestionOptions().map((option) => option.textContent);
   const status = screen.getByRole('status').textContent;
   await user.keyboard('{Escape}');
   fireEvent.change(input, { target: { value: '' } });
   return { shown, status };
+}
+
+/** Options in the guess suggestion list only (not the library's menus). */
+function suggestionOptions() {
+  const input = screen.getByRole('combobox', { name: 'Your guess' });
+  const list = document.getElementById(input.getAttribute('aria-controls')!)!;
+  return within(list).queryAllByRole('option');
 }
 
 function guessRows() {
@@ -343,8 +350,12 @@ describe('NM Skill Library filter', () => {
     (skill) => skill.profession === 1 && !skill.elite,
   )!;
 
+  // The library is open by default; nothing to click.
   async function openLibrary(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: 'Browse skills' }));
+    expect(user).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Hide skills' }).getAttribute('aria-expanded'),
+    ).toBe('true');
   }
 
   it('is shared by Daily NM and Infinite NM, hidden in HM, and restored after HM', async () => {
@@ -412,8 +423,7 @@ describe('guess autocomplete', () => {
     const target = hmWrongGuesses.find((skill) => /^[A-Za-z ]+$/.test(skill.name))!;
 
     await user.type(guessInput(), target.name.toLowerCase());
-    const position = screen
-      .getAllByRole('option')
+    const position = suggestionOptions()
       .findIndex((option) => option.textContent === target.name);
     await user.keyboard('{ArrowDown}'.repeat(position + 1) + '{Enter}');
 
@@ -471,8 +481,62 @@ describe('guess autocomplete', () => {
     await user.type(guessInput(), 'sand');
     fireEvent.click(screen.getByRole('button', { name: /give me the answer/ }));
 
-    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Your guess' })).toBeNull();
     expect(screen.queryByRole('listbox', { hidden: true })).toBeNull();
+  });
+});
+
+describe('Skill Library filters and sorting vs gameplay', () => {
+  const librarySelect = (name: string) =>
+    within(screen.getByRole('region', { name: 'Skill Library' })).getByRole(
+      'combobox',
+      { name },
+    );
+
+  it('the library is open on load without scrolling or taking focus', () => {
+    renderApp();
+    expect(
+      screen.getByRole('button', { name: 'Hide skills' }).getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('library filters and sorting never change suggestions, answers, or saved progress', async () => {
+    const user = renderApp();
+    await guess(user, hmWrongGuesses[0].name);
+    const savedBefore = window.localStorage.getItem(HM_KEY);
+    const totalBefore = (await suggestionTotal(user)).total;
+
+    const library = screen.getByRole('region', { name: 'Skill Library' });
+    fireEvent.click(within(library).getByRole('button', { name: 'Elementalist' }));
+    fireEvent.change(librarySelect('Attribute'), { target: { value: 'Fire Magic' } });
+    fireEvent.change(librarySelect('Type'), { target: { value: 'family:spell' } });
+    fireEvent.change(librarySelect('Sort by'), { target: { value: 'energy' } });
+    fireEvent.change(librarySelect('Order'), { target: { value: 'desc' } });
+
+    expect((await suggestionTotal(user)).total).toBe(totalBefore);
+    expect(window.localStorage.getItem(HM_KEY)).toBe(savedBefore);
+    expect(guessRows()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /give me the answer/ }));
+    expect(document.querySelector('.revealed-answer a')!.textContent).toBe(
+      hmAnswer.name,
+    );
+  });
+
+  it('NM guesses stay elite-only whatever the library shows', async () => {
+    window.localStorage.setItem('gw-skilldle-library-nm-show-non-elite', 'true');
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+
+    fireEvent.change(librarySelect('Sort by'), { target: { value: 'elite' } });
+    fireEvent.change(librarySelect('Order'), { target: { value: 'desc' } });
+
+    expect((await suggestionTotal(user)).total).toBe(eliteSkills.length);
+    await guess(user, nonElite.name);
+    expect(screen.getByText('Skilldle NM only accepts elite skills.')).toBeTruthy();
+    expect(guessRows()).toHaveLength(0);
   });
 });
 

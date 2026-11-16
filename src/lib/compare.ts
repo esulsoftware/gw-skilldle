@@ -88,7 +88,7 @@ export function compareProfession(guess: string, answer: string): Result {
   return 'none';
 }
 
-function typeFamily(type: string): string | null {
+export function typeFamily(type: string): string | null {
   const normalizedType = type.trim().toLocaleLowerCase();
 
   if (

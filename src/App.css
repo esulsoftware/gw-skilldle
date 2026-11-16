@@ -851,3 +851,81 @@ h1 {
   color: #b9a98e;
   font-size: 0.8rem;
 }
+
+/* Skill Library: filters, sorting, and stat lines */
+.library-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  align-items: end;
+  gap: 0.6rem;
+  margin: 0.85rem 0 0.4rem;
+}
+
+.library-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  color: #b9a98e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.library-control select {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid #7a6243;
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.55rem;
+  color: #fff5e3;
+  background: #292019;
+  font-size: 0.9rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.library-control select:focus-visible,
+.library-reset:focus-visible {
+  outline: 2px solid #f4d27a;
+  outline-offset: 2px;
+}
+
+.library-reset {
+  min-height: 2.75rem;
+  border: 1px solid #7a6243;
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  color: #f2e6d0;
+  background: #292019;
+  font-weight: 700;
+}
+
+.library-reset:hover:not(:disabled) {
+  background: #403127;
+}
+
+.library-reset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.library-empty .library-reset {
+  margin-top: 0.4rem;
+}
+
+.library-skill-stats,
+.skill-grid-popup-stats {
+  margin: 0.35rem 0 0;
+  color: #c9ad78;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 420px) {
+  .library-controls {
+    grid-template-columns: 1fr;
+  }
+}

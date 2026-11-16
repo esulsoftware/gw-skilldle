@@ -26,7 +26,7 @@ it.each(['List', 'Grid'] as const)(
   async (view) => {
     const user = userEvent.setup();
     render(<SkillLibrary nmMode />);
-    await user.click(screen.getByRole('button', { name: 'Browse skills' }));
+    // The library is open by default.
     await user.click(screen.getByRole('button', { name: view }));
     await user.click(screen.getByRole('button', { name: 'PvE' }));
 
