@@ -756,3 +756,98 @@ h1 {
   margin: 1rem 0 0;
   color: #d8ceb9;
 }
+
+/* Guess autocomplete (combobox with icons) */
+.combobox {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.combobox input {
+  width: 100%;
+}
+
+.combobox-popup {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  max-height: min(20rem, 45vh);
+  max-height: min(20rem, 45dvh);
+  overflow: hidden;
+  border: 1px solid #7a6243;
+  border-radius: 0.45rem;
+  background: #1f1810;
+  box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.5);
+}
+
+.combobox-popup[hidden] {
+  display: none;
+}
+
+.combobox-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.combobox-list[hidden] {
+  display: none;
+}
+
+.combobox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.35rem;
+  color: #f2e6d0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.combobox-option:hover {
+  background: #33281f;
+}
+
+.combobox-option.active {
+  color: #271b0d;
+  background: #e5b75d;
+  outline: 2px solid #f4d27a;
+  outline-offset: -2px;
+}
+
+.combobox-icon {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #9f7b43;
+  border-radius: 0.2rem;
+  background: #17110d;
+  object-fit: cover;
+  user-select: none;
+}
+
+.combobox-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.combobox-status {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-top: 1px solid #44382e;
+  color: #b9a98e;
+  font-size: 0.8rem;
+}
