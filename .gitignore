@@ -5,3 +5,5 @@ skill
 skill-types.txt
 tmp/
 skill-icon-download-report.csv
+scripts/buildle/cache/
+scripts/buildle/output/

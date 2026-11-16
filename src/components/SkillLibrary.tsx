@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   ALL,
   LIBRARY_TABS,
@@ -33,9 +33,22 @@ type SkillLibraryProps = {
    * checkbox and, while it is unchecked, lists elite skills only.
    */
   nmMode?: boolean;
+  /**
+   * False while another game is shown. The library stays mounted (keeping its
+   * tab, filters, and sort) but drops the grid, whose open popups listen on
+   * the whole document for Escape, scrolling, and outside taps.
+   */
+  active?: boolean;
 };
 
-export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
+export default function SkillLibrary({
+  nmMode = false,
+  active = true,
+}: SkillLibraryProps) {
+  // Unique per instance: Skilldle and Buildle each mount a library.
+  const idBase = useId();
+  const titleId = `${idBase}-title`;
+  const contentId = `${idBase}-content`;
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [selectedLibraryFilter, setSelectedLibraryFilter] =
     useState<LibraryTab>('Warrior');
@@ -137,10 +150,10 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
   }
 
   return (
-    <section className="skill-library" aria-labelledby="skill-library-title">
+    <section className="skill-library" aria-labelledby={titleId}>
       <div className="library-heading">
         <div>
-          <h2 id="skill-library-title">Skill Library</h2>
+          <h2 id={titleId}>Skill Library</h2>
           <p>Browse skills by profession without affecting your game.</p>
         </div>
 
@@ -149,14 +162,14 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
           className="library-toggle"
           onClick={() => setLibraryOpen((isOpen) => !isOpen)}
           aria-expanded={libraryOpen}
-          aria-controls="skill-library-content"
+          aria-controls={contentId}
         >
           {libraryOpen ? 'Hide skills' : 'Browse skills'}
         </button>
       </div>
 
       {libraryOpen && (
-        <div id="skill-library-content" className="library-content">
+        <div id={contentId} className="library-content">
           <div
             className="profession-filters"
             aria-label="Filter skill library by profession"
@@ -304,6 +317,7 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
               </button>
             </div>
           ) : view === 'grid' ? (
+            !active ? null :
             // Keyed by everything that changes the visible icons or their
             // order, so details reset and the Tab stop stays valid.
             <SkillGrid

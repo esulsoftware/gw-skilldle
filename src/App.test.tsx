@@ -554,3 +554,57 @@ describe('Infinite NM', () => {
     ).toBeTruthy();
   });
 });
+
+describe('giving up returns to the revealed answer', () => {
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+  const originalMatchMedia = window.matchMedia;
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    window.matchMedia = originalMatchMedia;
+  });
+
+  function recordScrolls(reducedMotion = false) {
+    const calls: { element: Element; text: string; options: unknown }[] = [];
+    Element.prototype.scrollIntoView = function (this: Element, options?: unknown) {
+      calls.push({ element: this, text: this.textContent ?? '', options });
+    } as typeof Element.prototype.scrollIntoView;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion }) as unknown as typeof window.matchMedia;
+    return calls;
+  }
+
+  it('scrolls to the revealed answer after it has rendered', async () => {
+    const calls = recordScrolls();
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].element.className).toContain('game-over');
+    expect(calls[0].text).toContain(hmAnswer.name);
+    expect(calls[0].options).toEqual({ behavior: 'smooth', block: 'start' });
+    expect(screen.queryByRole('combobox', { name: 'Your guess' })).toBeNull(); // no pinned form left
+  });
+
+  it('scrolls immediately when reduced motion is preferred', async () => {
+    const calls = recordScrolls(true);
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+    expect(calls[0].options).toEqual({ behavior: 'auto', block: 'start' });
+  });
+
+  it('accepted guesses keep their existing behaviour; rejected ones do not scroll', async () => {
+    const calls = recordScrolls();
+    const user = renderApp();
+    await guess(user, 'Not a skill');
+    await guess(user, hmWrongGuesses[0].name);
+    await guess(user, hmWrongGuesses[0].name);
+    expect(calls).toEqual([]); // the board is on screen, so no return is needed
+  });
+
+  it('a given-up Daily restored on load does not scroll', () => {
+    window.localStorage.setItem(HM_KEY, JSON.stringify({ guessedSkillIds: [], gaveUp: true }));
+    const calls = recordScrolls();
+    renderApp();
+    expect(screen.getByText(/The skill was/)).toBeTruthy();
+    expect(calls).toEqual([]);
+  });
+});

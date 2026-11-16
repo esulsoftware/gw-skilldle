@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
@@ -42,11 +42,12 @@ function chunk<T>(items: T[], size: number): T[][] {
   return rows;
 }
 
-function descriptionId(skill: Skill): string {
-  return `grid-skill-description-${skill.id}`;
-}
-
 export default function SkillGrid({ skills, label }: SkillGridProps) {
+  // Unique per grid, so two mounted Skill Libraries never share IDs.
+  const idBase = useId();
+  const descriptionId = (skill: Skill) => `${idBase}-description-${skill.id}`;
+  const instructionsId = `${idBase}-instructions`;
+  const panelTitleId = `${idBase}-panel-title`;
   const containerRef = useRef<HTMLDivElement>(null);
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -404,7 +405,7 @@ export default function SkillGrid({ skills, label }: SkillGridProps) {
 
   return (
     <>
-      <p id="skill-grid-instructions" className="visually-hidden">
+      <p id={instructionsId} className="visually-hidden">
         Use the arrow keys to move between skills. Press Enter to open the
         skill’s Guild Wars Wiki page.
       </p>
@@ -414,7 +415,7 @@ export default function SkillGrid({ skills, label }: SkillGridProps) {
         className="skill-grid"
         role="grid"
         aria-label={label}
-        aria-describedby="skill-grid-instructions"
+        aria-describedby={instructionsId}
         onKeyDown={handleKeyDown}
       >
         {rows.map((row, rowIndex) => (
@@ -515,7 +516,7 @@ export default function SkillGrid({ skills, label }: SkillGridProps) {
           className="skill-grid-panel"
           role="dialog"
           aria-modal="false"
-          aria-labelledby="skill-grid-panel-title"
+          aria-labelledby={panelTitleId}
           tabIndex={-1}
         >
           <div className="skill-grid-panel-header">
@@ -525,7 +526,7 @@ export default function SkillGrid({ skills, label }: SkillGridProps) {
               alt=""
               aria-hidden="true"
             />
-            <h3 id="skill-grid-panel-title" className="skill-grid-popup-name">
+            <h3 id={panelTitleId} className="skill-grid-popup-name">
               {touchSkill.name}
               {isPveSkill(touchSkill) && <span className="pve-tag">PvE</span>}
             </h3>
