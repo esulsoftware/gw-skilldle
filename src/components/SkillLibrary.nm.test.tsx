@@ -26,7 +26,7 @@ const monkElites = skills.filter(
 async function openLibrary(nmMode: boolean, view?: 'Grid' | 'List') {
   const user = userEvent.setup();
   const result = render(<SkillLibrary nmMode={nmMode} />);
-  await user.click(screen.getByRole('button', { name: 'Browse skills' }));
+  // The library is open by default.
 
   if (view) {
     await user.click(screen.getByRole('button', { name: view }));

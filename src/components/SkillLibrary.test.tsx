@@ -20,7 +20,7 @@ const warriorSkills = sortedSkillsFor('Warrior');
 async function openLibrary(view?: 'Grid' | 'List') {
   const user = userEvent.setup();
   render(<SkillLibrary />);
-  await user.click(screen.getByRole('button', { name: 'Browse skills' }));
+  // The library is open by default.
 
   if (view) {
     await user.click(screen.getByRole('button', { name: view }));

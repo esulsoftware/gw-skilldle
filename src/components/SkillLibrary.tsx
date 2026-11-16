@@ -1,5 +1,22 @@
 import { useMemo, useState } from 'react';
 import {
+  ALL,
+  LIBRARY_TABS,
+  allAttributesLabel,
+  attributeFilterLabel,
+  attributeOptions,
+  matchesAttribute,
+  matchesType,
+  skillStatLine,
+  sortFields,
+  sortSkills,
+  tabPool,
+  typeOptions,
+  type LibraryTab,
+  type SortDirection,
+  type SortKey,
+} from '../lib/libraryFilters';
+import {
   readLibraryView,
   readShowNonElite,
   saveLibraryView,
@@ -7,29 +24,8 @@ import {
   type LibraryView,
 } from '../lib/libraryView';
 import { skillIconPath, wikiUrl } from '../lib/skillLinks';
-import {
-  isPveSkill,
-  isRankBasedPveSkill,
-  professionName,
-  skills,
-} from '../lib/skills';
+import { isPveSkill, skills } from '../lib/skills';
 import SkillGrid from './SkillGrid';
-
-const LIBRARY_FILTERS = [
-  'Warrior',
-  'Ranger',
-  'Monk',
-  'Necromancer',
-  'Mesmer',
-  'Elementalist',
-  'Assassin',
-  'Ritualist',
-  'Paragon',
-  'Dervish',
-  'PvE',
-] as const;
-
-type LibraryFilter = (typeof LIBRARY_FILTERS)[number];
 
 type SkillLibraryProps = {
   /**
@@ -40,30 +36,88 @@ type SkillLibraryProps = {
 };
 
 export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const [selectedLibraryFilter, setSelectedLibraryFilter] =
-    useState<LibraryFilter>('Warrior');
+    useState<LibraryTab>('Warrior');
   const [view, setView] = useState<LibraryView>(readLibraryView);
   // Kept while in HM (where it is ignored), so returning to NM restores it.
   const [showNonElite, setShowNonElite] = useState(readShowNonElite);
 
+  // Optional filters and sorting: in-session only.
+  const [attributeFilter, setAttributeFilter] = useState(ALL);
+  const [typeFilter, setTypeFilter] = useState(ALL);
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
   const eliteOnly = nmMode && !showNonElite;
+  const tab = selectedLibraryFilter;
 
-  const librarySkills = useMemo(() => {
-    const matchingSkills = (
-      selectedLibraryFilter === 'PvE'
-        ? skills.filter(isRankBasedPveSkill)
-        : skills.filter(
-            (skill) => professionName(skill) === selectedLibraryFilter,
-          )
-    ).filter((skill) => !eliteOnly || skill.elite);
+  // Menu choices come from the tab's eligible pool before optional filters,
+  // so changing one filter never removes the other's options.
+  const pool = useMemo(() => tabPool(skills, tab, eliteOnly), [tab, eliteOnly]);
+  const attributeChoices = useMemo(() => attributeOptions(pool), [pool]);
+  const typeChoices = useMemo(() => typeOptions(pool), [pool]);
+  const fields = sortFields(tab, eliteOnly);
 
-    return [...matchingSkills].sort((first, second) =>
-      first.name.localeCompare(second.name, undefined, {
-        sensitivity: 'base',
-      }),
-    );
-  }, [eliteOnly, selectedLibraryFilter]);
+  // When the eligible pool changes (tab, NM mode, or the non-elite checkbox),
+  // reset only the selections it made unavailable.
+  const eligibilityKey = `${tab}|${eliteOnly}`;
+  const [seenEligibilityKey, setSeenEligibilityKey] = useState(eligibilityKey);
+
+  if (seenEligibilityKey !== eligibilityKey) {
+    setSeenEligibilityKey(eligibilityKey);
+
+    if (
+      attributeFilter !== ALL &&
+      !attributeChoices.some((option) => option.value === attributeFilter)
+    ) {
+      setAttributeFilter(ALL);
+    }
+
+    if (
+      typeFilter !== ALL &&
+      !typeChoices.some((section) =>
+        section.options.some((option) => option.value === typeFilter),
+      )
+    ) {
+      setTypeFilter(ALL);
+    }
+
+    if (!fields.some((field) => field.key === sortKey)) {
+      setSortKey('name');
+      setSortDirection('asc');
+    }
+  }
+
+  const visibleSkills = useMemo(
+    () =>
+      sortSkills(
+        pool.filter(
+          (skill) =>
+            matchesAttribute(skill, attributeFilter) &&
+            matchesType(skill, typeFilter),
+        ),
+        sortKey,
+        sortDirection,
+      ),
+    [attributeFilter, pool, sortDirection, sortKey, typeFilter],
+  );
+
+  const filtersActive = attributeFilter !== ALL || typeFilter !== ALL;
+  const isDefault =
+    !filtersActive && sortKey === 'name' && sortDirection === 'asc';
+  const activeField =
+    fields.find((field) => field.key === sortKey) ?? fields[0];
+  const poolLabel = `${eliteOnly ? 'elite ' : ''}${tab} skills`;
+  const countText = filtersActive
+    ? `${visibleSkills.length} of ${pool.length} ${poolLabel}`
+    : `${pool.length} ${poolLabel}`;
+
+  function changeTab(nextTab: LibraryTab) {
+    setSelectedLibraryFilter(nextTab);
+    // Attributes differ per tab; type and sort carry over when still valid.
+    setAttributeFilter(ALL);
+  }
 
   function changeView(nextView: LibraryView) {
     setView(nextView);
@@ -73,6 +127,13 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
   function changeShowNonElite(nextShowNonElite: boolean) {
     setShowNonElite(nextShowNonElite);
     saveShowNonElite(nextShowNonElite);
+  }
+
+  function resetFiltersAndSort() {
+    setAttributeFilter(ALL);
+    setTypeFilter(ALL);
+    setSortKey('name');
+    setSortDirection('asc');
   }
 
   return (
@@ -100,7 +161,7 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
             className="profession-filters"
             aria-label="Filter skill library by profession"
           >
-            {LIBRARY_FILTERS.map((filter) => (
+            {LIBRARY_TABS.map((filter) => (
               <button
                 key={filter}
                 type="button"
@@ -109,17 +170,88 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
                     ? 'profession-button active'
                     : 'profession-button'
                 }
-                onClick={() => setSelectedLibraryFilter(filter)}
+                onClick={() => changeTab(filter)}
               >
                 {filter}
               </button>
             ))}
           </div>
 
+          <div className="library-controls">
+            <label className="library-control">
+              <span>{attributeFilterLabel(tab)}</span>
+              <select
+                value={attributeFilter}
+                onChange={(event) => setAttributeFilter(event.target.value)}
+              >
+                <option value={ALL}>{allAttributesLabel(tab)}</option>
+                {attributeChoices.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="library-control">
+              <span>Type</span>
+              <select
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value)}
+              >
+                <option value={ALL}>All types</option>
+                {typeChoices.map((section) => (
+                  <optgroup key={section.label} label={section.label}>
+                    {section.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+
+            <label className="library-control">
+              <span>Sort by</span>
+              <select
+                value={activeField.key}
+                onChange={(event) => setSortKey(event.target.value as SortKey)}
+              >
+                {fields.map((field) => (
+                  <option key={field.key} value={field.key}>
+                    {field.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="library-control">
+              <span>Order</span>
+              <select
+                value={sortDirection}
+                onChange={(event) =>
+                  setSortDirection(event.target.value as SortDirection)
+                }
+              >
+                <option value="asc">{activeField.ascLabel}</option>
+                <option value="desc">{activeField.descLabel}</option>
+              </select>
+            </label>
+
+            <button
+              type="button"
+              className="library-reset"
+              onClick={resetFiltersAndSort}
+              disabled={isDefault}
+            >
+              Reset filters &amp; sort
+            </button>
+          </div>
+
           <div className="library-toolbar">
-            <p className="library-count">
-              {librarySkills.length} {eliteOnly ? 'elite ' : ''}
-              {selectedLibraryFilter} skills
+            <p className="library-count" aria-live="polite">
+              {countText}
             </p>
 
             {nmMode && (
@@ -155,22 +287,40 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
             </div>
           </div>
 
-          {librarySkills.length === 0 ? (
+          {pool.length === 0 ? (
             <p className="library-empty">
-              No elite {selectedLibraryFilter} skills. Check “Show non-elite
-              skills” to browse the rest of this category.
+              No elite {tab} skills. Check “Show non-elite skills” to browse
+              the rest of this category.
             </p>
+          ) : visibleSkills.length === 0 ? (
+            <div className="library-empty">
+              <p>No skills match these filters.</p>
+              <button
+                type="button"
+                className="library-reset"
+                onClick={resetFiltersAndSort}
+              >
+                Reset filters &amp; sort
+              </button>
+            </div>
           ) : view === 'grid' ? (
-            // Keyed by the visible list, so a filter or elite-only change
-            // starts with fresh details and a valid keyboard Tab stop.
+            // Keyed by everything that changes the visible icons or their
+            // order, so details reset and the Tab stop stays valid.
             <SkillGrid
-              key={`${selectedLibraryFilter}:${eliteOnly ? 'elite' : 'all'}`}
-              skills={librarySkills}
-              label={`${selectedLibraryFilter} skills`}
+              key={[
+                tab,
+                eliteOnly,
+                attributeFilter,
+                typeFilter,
+                sortKey,
+                sortDirection,
+              ].join('|')}
+              skills={visibleSkills}
+              label={`${tab} skills`}
             />
           ) : (
             <ul className="skill-list">
-              {librarySkills.map((skill) => (
+              {visibleSkills.map((skill) => (
                 <li key={skill.id} className="skill-list-item">
                   <div className="library-skill-top">
                     <img
@@ -196,6 +346,8 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
                       {isPveSkill(skill) && <span className="pve-tag">PvE</span>}
                     </div>
                   </div>
+
+                  <p className="library-skill-stats">{skillStatLine(skill)}</p>
 
                   {skill.description && (
                     <p className="library-skill-description">

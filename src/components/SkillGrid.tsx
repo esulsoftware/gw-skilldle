@@ -5,6 +5,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from 'react';
 import { columnsForWidth, isGridKey, nextGridIndex } from '../lib/gridNavigation';
+import { skillStatLine } from '../lib/libraryFilters';
 import { skillIconPath, wikiUrl } from '../lib/skillLinks';
 import { isPveSkill, type Skill } from '../lib/skills';
 
@@ -466,6 +467,7 @@ export default function SkillGrid({ skills, label }: SkillGridProps) {
                   </a>
                   <span id={descriptionId(skill)} className="visually-hidden">
                     {isPveSkill(skill) ? 'PvE skill. ' : ''}
+                    {`${skillStatLine(skill)}. `}
                     {skill.description}
                   </span>
                 </div>
@@ -498,6 +500,7 @@ export default function SkillGrid({ skills, label }: SkillGridProps) {
             {hoverSkill.name}
             {isPveSkill(hoverSkill) && <span className="pve-tag">PvE</span>}
           </p>
+          <p className="skill-grid-popup-stats">{skillStatLine(hoverSkill)}</p>
           {hoverSkill.description && (
             <p className="skill-grid-popup-description">
               {hoverSkill.description}
@@ -535,6 +538,8 @@ export default function SkillGrid({ skills, label }: SkillGridProps) {
               ×
             </button>
           </div>
+
+          <p className="skill-grid-popup-stats">{skillStatLine(touchSkill)}</p>
 
           {touchSkill.description && (
             <p className="skill-grid-popup-description skill-grid-panel-description">
