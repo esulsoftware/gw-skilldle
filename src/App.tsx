@@ -28,6 +28,7 @@ import {
   type Result,
 } from './lib/compare';
 import { skillIconPath, wikiUrl } from './lib/skillLinks';
+import { solveTitle } from './lib/titles';
 import { scrollToElement } from './lib/scrolling';
 import SkillCombobox from './components/SkillCombobox';
 import SkillLibrary from './components/SkillLibrary';
@@ -659,6 +660,11 @@ export default function App() {
       {gameOver && (
         <section ref={resultRef} className={`game-over ${won ? 'won' : 'lost'}`}>
           <h2>{won ? 'Solved!' : 'The Mists have claimed another hero.'}</h2>
+          {won && (
+            <p className="solve-title">
+              Title: <strong>{solveTitle({ solved: true, guessCount: guesses.length })}</strong>
+            </p>
+          )}
 
           <div className="revealed-answer">
             <img
@@ -724,21 +730,24 @@ export default function App() {
 
       <footer className="site-footer">
         <p>
-          GW Skilldle is an unofficial, non-commercial fan project. It is not
+          GW Skilldle is an unofficial, non-commercial fan project and is not
           affiliated with, endorsed by, sponsored by, or approved by ArenaNet
-          LLC, NCSOFT Corporation, or their affiliates.
+          or NCSOFT.
+        </p>
+        <p>
+          © ArenaNet LLC. All rights reserved. NCSOFT, ArenaNet, Guild Wars,
+          Guild Wars 2, GW2, and all associated logos, designs, and composite
+          marks are trademarks or registered trademarks of NCSOFT Corporation.
+          All other trademarks are the property of their respective owners.
+        </p>
+        <p>
+          Game data and skill information compiled with reference to the
+          official Guild Wars Wiki (wiki.guildwars.com, GFDL 1.3+); in-game
+          skill names, descriptions, and icon artwork remain © ArenaNet LLC.
         </p>
         <p>
           Feedback, bug reports, or rights concerns:{' '}
           <a href="mailto:esulsoftware@gmail.com">esulsoftware@gmail.com</a>
-        </p>
-        <p>
-          Guild Wars Games © ArenaNet LLC. All rights reserved.
-          <br />
-          NCSOFT, ArenaNet, Guild Wars, Guild Wars Factions, Guild Wars
-          Nightfall, Guild Wars: Eye of the North, and all associated logos and
-          designs are trademarks or registered trademarks of NCSOFT Corporation.
-          All other trademarks are the property of their respective owners.
         </p>
       </footer>
     </main>

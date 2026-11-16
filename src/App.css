@@ -220,6 +220,16 @@ h1 {
   color: #f0a49a;
 }
 
+/* Solve title (Hall of Monuments reward track), shown only on a solve. */
+.solve-title {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.solve-title strong {
+  color: #e8c66a;
+}
+
 .answer-description {
   color: #d6c7ae;
   line-height: 1.55;
