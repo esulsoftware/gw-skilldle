@@ -11,7 +11,6 @@ vi.mock('./lib/games', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./lib/games')>();
   return {
     ...actual,
-    buildleEnabled: true,
     loadBuildle: () => {
       loader.calls += 1;
       if (loader.failNext) {

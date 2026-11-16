@@ -34,7 +34,6 @@ import SkillLibrary from './components/SkillLibrary';
 import {
   DEFAULT_GAME,
   GAME_OPTIONS,
-  buildleEnabled,
   loadBuildle,
   type Game,
 } from './lib/games';
@@ -389,25 +388,23 @@ export default function App() {
           with, endorsed by, sponsored by, or approved by ArenaNet or NCSOFT.
         </p>
 
-        {buildleEnabled && (
-          <div className="game-switcher" role="group" aria-label="Game">
-            {GAME_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={
-                  activeGame === option.value
-                    ? 'game-button active'
-                    : 'game-button'
-                }
-                aria-pressed={activeGame === option.value}
-                onClick={() => changeGame(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="game-switcher" role="group" aria-label="Game">
+          {GAME_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={
+                activeGame === option.value
+                  ? 'game-button active'
+                  : 'game-button'
+              }
+              aria-pressed={activeGame === option.value}
+              onClick={() => changeGame(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
 
         <div className="game-view" hidden={!skilldleActive}>
         <p>
@@ -706,7 +703,7 @@ export default function App() {
       <SkillLibrary nmMode={isNm} active={skilldleActive} />
       </div>
 
-      {buildleEnabled && buildle.status !== 'idle' && (
+      {buildle.status !== 'idle' && (
         <div className="game-view" hidden={activeGame !== 'buildle'}>
           {buildle.status === 'ready' ? (
             <buildle.Game active={activeGame === 'buildle'} />

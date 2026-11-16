@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
- "status": "provisional-unreleased",
- "description": "Buildle Daily schedules. A version's start date, order, and catalog revision never change once shipped; add a new version instead. PROVISIONAL: preview schedule only; the production launch date is not confirmed and this file may still change before release.",
+ "status": "released",
+ "description": "Buildle Daily schedules. A version's start date, order, and catalog revision never change once shipped; add a new version instead.",
  "versions": [
   {
    "version": 1,

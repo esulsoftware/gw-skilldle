@@ -305,19 +305,35 @@ const argValue = (name) => {
 };
 
 /** Writes a published data file, refusing to change it unless allowed. */
-function writeImmutable(path, text) {
-  let existing = null;
+/** Reads a file, or null if it does not exist. Line endings are normalised. */
+function readExisting(path) {
   try {
-    existing = readFileSync(path, 'utf8');
+    return readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
   } catch {
-    // New file.
+    return null;
   }
+}
 
-  if (existing !== null && existing !== text && !process.argv.includes('--replace-unreleased')) {
-    throw new Error(
-      `${path} already exists with different content. Published Buildle data is immutable: ` +
-        'create a new revision/version, or pass --replace-unreleased if this one has never shipped.',
-    );
+/**
+ * Writes a published data file, refusing to change it: corrections go in a
+ * new catalog revision or schedule version. --replace-unreleased allows a
+ * change only while the schedule has never been released.
+ */
+function writeImmutable(path, text, released) {
+  const existing = readExisting(path);
+
+  if (existing !== null && existing !== text) {
+    if (released) {
+      throw new Error(
+        `${path} has been released and is immutable. Create a new catalog revision or schedule version instead.`,
+      );
+    }
+    if (!process.argv.includes('--replace-unreleased')) {
+      throw new Error(
+        `${path} already exists with different content. Published Buildle data is immutable: ` +
+          'create a new revision/version, or pass --replace-unreleased if this one has never shipped.',
+      );
+    }
   }
 
   writeFileSync(path, text);
@@ -326,12 +342,20 @@ function writeImmutable(path, text) {
 if (process.argv.includes('--release')) {
   const dataDir = join(root, 'src', 'data', 'buildle');
   mkdirSync(dataDir, { recursive: true });
-  writeImmutable(join(dataDir, 'catalog-r1.json'), catalogText);
 
-  const startsOn = argValue('--start-date') ?? '2026-11-16';
-  // Until the production launch date is confirmed, the schedule is a
-  // provisional preview schedule: --release-status released marks it shipped.
-  const status = argValue('--release-status') ?? 'provisional-unreleased';
+  // Once released, schedule v1 and catalog r1 can never be replaced. By
+  // default a re-run keeps the existing start date and status, so it
+  // reproduces the same files.
+  const existingText = readExisting(join(dataDir, 'schedule.json'));
+  const existing = existingText ? JSON.parse(existingText) : null;
+  const released = existing?.status === 'released';
+
+  writeImmutable(join(dataDir, 'catalog-r1.json'), catalogText, released);
+
+  const startsOn = argValue('--start-date') ?? existing?.versions?.[0]?.startsOn ?? '2026-11-16';
+  // Before launch the schedule is a provisional preview schedule;
+  // --release-status released marks it shipped (launch: 2026-11-16, UTC).
+  const status = argValue('--release-status') ?? existing?.status ?? 'provisional-unreleased';
   const schedule = {
     schemaVersion: 1,
     status,
@@ -342,7 +366,7 @@ if (process.argv.includes('--release')) {
         : ' PROVISIONAL: preview schedule only; the production launch date is not confirmed and this file may still change before release.'),
     versions: [buildSchedule(catalog, { version: 1, startsOn, isElite: (id) => skillById.get(id).elite })],
   };
-  writeImmutable(join(dataDir, 'schedule.json'), `${JSON.stringify(schedule, null, 1)}\n`);
+  writeImmutable(join(dataDir, 'schedule.json'), `${JSON.stringify(schedule, null, 1)}\n`, released);
   console.log(`Wrote catalog r1 and schedule v1 (starts ${startsOn}).`);
 }
 

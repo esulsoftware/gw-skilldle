@@ -18,7 +18,7 @@ import {
   puzzleCatalog,
   skillFor,
 } from './buildle';
-import { resolvePuzzle } from './buildleDaily';
+import { loadDaily, resolvePuzzle } from './buildleDaily';
 import { isInSkillPool } from './modes';
 
 const dataDir = join(process.cwd(), 'src', 'data', 'buildle');
@@ -71,15 +71,42 @@ describe('catalog revision 1', () => {
 describe('Daily schedule version 1', () => {
   const [v1] = scheduleData.versions;
 
-  it('uses catalog revision 1 and the provisional 2026-11-16 start', () => {
+  it('uses catalog revision 1 and the 2026-11-16 (UTC) launch date', () => {
     expect(scheduleData.versions).toHaveLength(1);
     expect(v1).toMatchObject({ version: 1, catalogRevision: 1, startsOn: '2026-11-16' });
   });
 
-  it('is explicitly marked provisional and unreleased (launch date not confirmed)', () => {
-    // Changes to "released" only in the approved final release configuration.
-    expect(scheduleData.status).toBe('provisional-unreleased');
-    expect(scheduleData.description).toMatch(/PROVISIONAL/);
+  it('is marked released, with no provisional wording left', () => {
+    expect(scheduleData.status).toBe('released');
+    expect(scheduleData.description).not.toMatch(/PROVISIONAL/i);
+  });
+
+  it('a Daily saved during the preview loads unchanged under the released schedule', () => {
+    // Preview saves stored the full puzzle with catalog revision 1 and
+    // schedule version 1; releasing changed neither, so they still load.
+    const date = new Date('2026-11-16T12:00:00Z');
+    const fresh = loadDaily('hm', date, { storage: null });
+    if (fresh.kind !== 'puzzle') throw new Error('expected a Daily puzzle');
+
+    const guessId = isElite(fresh.puzzle.targetId) ? 109 : 132; // any wrong pool skill
+    const previewSave = JSON.stringify({
+      version: 1,
+      date: '2026-11-16',
+      difficulty: 'hm',
+      puzzle: fresh.puzzle,
+      guessIds: fresh.puzzle.variant.skillIds.includes(guessId) ? [] : [guessId],
+      hintRevealed: true,
+      status: 'playing',
+    });
+    const restored = loadDaily('hm', date, { storage: { getItem: () => previewSave } });
+
+    expect(restored).toMatchObject({
+      kind: 'puzzle',
+      status: 'playing',
+      hintRevealed: true,
+      puzzle: { key: fresh.puzzle.key, catalogRevision: 1, scheduleVersion: 1 },
+    });
+    expect(restored.kind === 'puzzle' && restored.puzzle.variant).toEqual(fresh.puzzle.variant);
   });
 
   it('lists every catalog puzzle exactly once per difficulty, and NM only elites', () => {
@@ -105,15 +132,14 @@ describe('Daily schedule version 1', () => {
 });
 
 describe('published files are immutable', () => {
-  // Update these hashes only before the first release (e.g. when the launch
-  // date is confirmed). After release, changes need a new catalog revision
-  // or schedule version instead.
+  // Released on 2026-11-16: these files must never change again. Any
+  // correction needs a new catalog revision or schedule version.
   it('catalog r1 and schedule v1 match their recorded hashes', () => {
     expect(sha256('catalog-r1.json')).toBe(
       '68a406fa05a0d6cb0e4f286552484a78f47f54096f585abc5aaec967c29a0911',
     );
     expect(sha256('schedule.json')).toBe(
-      '99f21298b16199bfc6c08468e75563651072049b59ed72eb3204542009ec47b9',
+      '75edcc0dd08bc10c987a3f941b3af2bd090967ff8d221580eb73740979f69fab',
     );
   });
 

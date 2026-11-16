@@ -81,11 +81,11 @@ NM additionally needs at least one eligible elite target.
 
 ## Daily schedule, revisions, and immutability
 
-- **Current status: provisional and unreleased.** `schedule.json` is marked
-  `"status": "provisional-unreleased"` with a provisional start date of
-  2026-11-16 for preview testing. The production launch date is not yet
-  confirmed; the final release regenerates it with the confirmed date and
-  `--release-status released`.
+- **Current status: released.** Schedule version 1 (catalog revision 1) is
+  marked `"status": "released"` and launches on **2026-11-16** (UTC). From
+  now on, `--release` refuses to change `schedule.json` or `catalog-r1.json`
+  at all — even with `--replace-unreleased` — and a plain re-run reproduces
+  them exactly.
 - `schedule.json` holds schedule **versions**. Each names a catalog revision,
   a start date (UTC, as Skilldle), a seed, and fixed-seed shuffled lists of
   puzzle keys (`variantId:skillId`) for HM and NM. Day N after the start plays
@@ -95,8 +95,8 @@ NM additionally needs at least one eligible elite target.
 - **Once shipped, a catalog revision and a schedule version never change.**
   Corrections or new bosses go in `catalog-r2.json` and a schedule version 2
   with a later start date. `--release` refuses to overwrite published files,
-  and tests pin their hashes. `--replace-unreleased` exists only for changes
-  before the first release (e.g. confirming the launch date).
+  and tests pin their hashes. `--replace-unreleased` only ever applied
+  before the first release.
 - Saved Daily progress (`gw-buildle-daily-v1:<hm|nm>:<date>`) stores the
   puzzle exactly as published (bar, target, boss, sources), plus schedule
   version, accepted guesses, hint state, and status, so later data changes

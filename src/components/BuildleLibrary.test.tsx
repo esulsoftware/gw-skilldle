@@ -44,7 +44,7 @@ const fixture = vi.hoisted(() => {
     },
     schedule: {
       schemaVersion: 1,
-      status: 'provisional-unreleased',
+      status: 'released',
       description: 'fixture',
       versions: [
         {
