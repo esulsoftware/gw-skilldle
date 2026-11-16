@@ -399,3 +399,38 @@ describe('pinned guess areas', () => {
     expect((document.getElementById('buildle-skill-input') as HTMLInputElement).value).toBe('Buildle draft');
   });
 });
+
+describe('give-up scrolling with both games mounted', () => {
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+  });
+
+  it('only the active game scrolls to its revealed answer', async () => {
+    const scrolled: Element[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    } as typeof Element.prototype.scrollIntoView;
+
+    const user = userEvent.setup();
+    render(<App />);
+    await openBuildle(user);
+
+    // Hidden Skilldle's give-up control is not reachable.
+    expect(screen.queryByRole('button', { name: /give me the answer/ })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Give up / show answer' }));
+    expect(scrolled).toEqual([]);
+    await user.click(screen.getByRole('button', { name: 'Yes, show the answer' }));
+
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0]).toBe(screen.getByRole('list', { name: 'Boss skill bar' }));
+
+    // Back in Skilldle: its own give-up scrolls to its own answer only.
+    await user.click(gameButton('Skilldle'));
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+    expect(scrolled).toHaveLength(2);
+    expect(scrolled[1].className).toContain('game-over');
+    expect(skilldleViews().some((view) => view.contains(scrolled[1]))).toBe(true);
+  });
+});

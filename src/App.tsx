@@ -28,6 +28,7 @@ import {
   type Result,
 } from './lib/compare';
 import { skillIconPath, wikiUrl } from './lib/skillLinks';
+import { scrollToElement } from './lib/scrolling';
 import SkillCombobox from './components/SkillCombobox';
 import SkillLibrary from './components/SkillLibrary';
 import {
@@ -170,6 +171,17 @@ type BuildleLoad =
 
 export default function App() {
   const boardRef = useRef<HTMLElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
+  // Bumped when the player gives up; the effect below then scrolls to the
+  // revealed answer once it has rendered. Loading a finished round never
+  // bumps it, so restored results do not scroll.
+  const [answerScrollRequest, setAnswerScrollRequest] = useState(0);
+
+  useEffect(() => {
+    if (answerScrollRequest > 0) {
+      scrollToElement(resultRef.current);
+    }
+  }, [answerScrollRequest]);
 
   const skillById = useMemo(
     () => new Map(skills.map((skill) => [skill.id, skill])),
@@ -296,7 +308,11 @@ export default function App() {
     setGaveUp(true);
     setInput('');
     setMessage('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Bring the revealed answer into view (only the active game can be here).
+    if (skilldleActive) {
+      setAnswerScrollRequest((count) => count + 1);
+    }
   }
 
   function submitGuess(event: FormEvent<HTMLFormElement>) {
@@ -644,7 +660,7 @@ export default function App() {
       )}
 
       {gameOver && (
-        <section className={`game-over ${won ? 'won' : 'lost'}`}>
+        <section ref={resultRef} className={`game-over ${won ? 'won' : 'lost'}`}>
           <h2>{won ? 'Solved!' : 'The Mists have claimed another hero.'}</h2>
 
           <div className="revealed-answer">

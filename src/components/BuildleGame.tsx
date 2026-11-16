@@ -23,6 +23,7 @@ import { guessPool, type Difficulty, type PlayMode } from '../lib/modes';
 import { skillIconPath, wikiUrl } from '../lib/skillLinks';
 import SkillCombobox from './SkillCombobox';
 import SkillLibrary from './SkillLibrary';
+import { scrollToElement } from '../lib/scrolling';
 
 type RoundKey = `${PlayMode}-${Difficulty}`;
 
@@ -134,6 +135,15 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
   const [message, setMessage] = useState('');
   const [confirmingGiveUp, setConfirmingGiveUp] = useState(false);
   const barRef = useRef<HTMLOListElement>(null);
+  // Bumped only by a confirmed give-up; the effect below then scrolls to the
+  // revealed bar once it has rendered. Restored finished Dailies never scroll.
+  const [answerScrollRequest, setAnswerScrollRequest] = useState(0);
+
+  useEffect(() => {
+    if (answerScrollRequest > 0) {
+      scrollToElement(barRef.current);
+    }
+  }, [answerScrollRequest]);
 
   const roundKey: RoundKey = `${playMode}-${difficulty}`;
   const round = rounds[roundKey]!;
@@ -256,22 +266,19 @@ export default function BuildleGame({ active = true }: BuildleGameProps) {
       return;
     }
 
-    const reduceMotion =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    window.requestAnimationFrame(() => {
-      barRef.current?.scrollIntoView({
-        behavior: reduceMotion ? 'auto' : 'smooth',
-        block: 'start',
-      });
-    });
+    window.requestAnimationFrame(() => scrollToElement(barRef.current));
   }
 
+  /** "Yes, show the answer": ends the round as given up, then shows the answer. */
   function giveUp() {
     updateRound({ status: 'gave-up', input: '' });
     setMessage('');
     setConfirmingGiveUp(false);
+
+    // Only the active game scrolls (an inactive one cannot be clicked anyway).
+    if (active) {
+      setAnswerScrollRequest((count) => count + 1);
+    }
   }
 
   const modeLabel = `${isDaily ? 'Daily' : 'Infinite'} ${difficulty.toUpperCase()}`;

@@ -770,3 +770,76 @@ describe('pinned guess area (same as Skilldle’s)', () => {
     expect(guessInput().value).toBe('Fire');
   });
 });
+
+describe('give up returns to the revealed answer', () => {
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+  const originalMatchMedia = window.matchMedia;
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    window.matchMedia = originalMatchMedia;
+  });
+
+  /** Records each scroll with what the element showed at that moment. */
+  function recordScrolls(reducedMotion = false) {
+    const calls: { element: Element; text: string; options: unknown }[] = [];
+    Element.prototype.scrollIntoView = function (this: Element, options?: unknown) {
+      calls.push({ element: this, text: this.textContent ?? '', options });
+    } as typeof Element.prototype.scrollIntoView;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion }) as unknown as typeof window.matchMedia;
+    return calls;
+  }
+
+  it('opening the confirmation and "Keep playing" do not scroll or change the round', async () => {
+    const calls = recordScrolls();
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    const before = slotTexts();
+
+    await user.click(screen.getByRole('button', { name: 'Give up / show answer' }));
+    await user.click(screen.getByRole('button', { name: 'Keep playing' }));
+
+    expect(calls).toEqual([]);
+    expect(slotTexts()).toEqual(before);
+    expect(guessInput()).toBeTruthy();
+  });
+
+  it('"Yes, show the answer" scrolls to the skill bar after the answer is shown', async () => {
+    const calls = recordScrolls();
+    const { user } = renderGame();
+    await giveUp(user);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].element).toBe(bar());
+    expect(calls[0].text).toContain('Missing skill: Chilblains'); // already rendered
+    expect(calls[0].options).toEqual({ behavior: 'smooth', block: 'start' });
+    expect(screen.getByRole('heading', { name: 'You gave up.' })).toBeTruthy();
+    expect(document.querySelector('form.guess-form')).toBeNull(); // nothing pinned over it
+  });
+
+  it('scrolls immediately when reduced motion is preferred', async () => {
+    const calls = recordScrolls(true);
+    const { user } = renderGame();
+    await giveUp(user);
+    expect(calls[0].options).toEqual({ behavior: 'auto', block: 'start' });
+  });
+
+  it('a finished Daily restored on load does not scroll', async () => {
+    const { user } = renderGame();
+    await giveUp(user);
+
+    const calls = recordScrolls();
+    refresh();
+    expect(screen.getByRole('heading', { name: 'You gave up.' })).toBeTruthy();
+    expect(calls).toEqual([]);
+  });
+
+  it('an inactive Buildle never initiates the scroll', async () => {
+    const calls = recordScrolls();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const user = userEvent.setup();
+    render(<BuildleGame active={false} />);
+    await giveUp(user);
+    expect(screen.getByRole('heading', { name: 'You gave up.' })).toBeTruthy();
+    expect(calls).toEqual([]);
+  });
+});
