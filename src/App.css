@@ -301,6 +301,16 @@ h1 {
   object-fit: cover;
 }
 
+.guess-number {
+  flex: 0 0 auto;
+  min-width: 1.6rem;
+  color: #c9ad78;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .revealed-answer {
   display: flex;
   align-items: center;

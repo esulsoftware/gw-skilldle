@@ -13,6 +13,14 @@ import {
   typeName,
   type Skill,
 } from './lib/skills';
+import {
+  energyCost,
+  gradeGuess,
+  resultArrow,
+  type ArrowKind,
+  type GradedGuess,
+  type Result,
+} from './lib/compare';
 import './App.css';
 
 const DAILY_STORAGE_PREFIX = 'gw-skilldle-daily-v3';
@@ -31,21 +39,6 @@ const LIBRARY_FILTERS = [
 ] as const;
 
 type GameMode = 'daily' | 'practice';
-type Result = 'correct' | 'partial' | 'higher' | 'lower' | 'none';
-
-type GradedGuess = {
-  skill: Skill;
-  results: {
-    profession: Result;
-    attribute: Result;
-    type: Result;
-    campaign: Result;
-    elite: Result;
-    energy: Result;
-    activation: Result;
-    recharge: Result;
-  };
-};
 
 type DailyProgress = {
   guessedSkillIds: number[];
@@ -60,172 +53,12 @@ function dailyStorageKey(): string {
   return `${DAILY_STORAGE_PREFIX}:${dailyDateKey()}`;
 }
 
-function compareBoolean(guess: boolean, answer: boolean): Result {
-  return guess === answer ? 'correct' : 'none';
-}
-
-function compareNumber(
-  guess: number | null,
-  answer: number | null,
-): Result {
-  if (guess === null && answer === null) {
-    return 'correct';
-  }
-
-  if (guess === null || answer === null) {
-    return 'none';
-  }
-
-  if (guess === answer) {
-    return 'correct';
-  }
-
-  return guess < answer ? 'higher' : 'lower';
-}
-
-function professionArmorClass(profession: string): string | null {
-  if (['Warrior', 'Paragon'].includes(profession)) {
-    return 'heavy';
-  }
-
-  if (['Ranger', 'Assassin', 'Dervish'].includes(profession)) {
-    return 'medium';
-  }
-
-  if (
-    ['Monk', 'Mesmer', 'Necromancer', 'Elementalist', 'Ritualist'].includes(
-      profession,
-    )
-  ) {
-    return 'light';
-  }
-
-  return null;
-}
-
-function compareProfession(guess: string, answer: string): Result {
-  if (guess === answer) {
-    return 'correct';
-  }
-
-  const guessArmorClass = professionArmorClass(guess);
-  const answerArmorClass = professionArmorClass(answer);
-
-  if (guessArmorClass && guessArmorClass === answerArmorClass) {
-    return 'partial';
-  }
-
-  return 'none';
-}
-
-function typeFamily(type: string): string | null {
-  const normalizedType = type.trim().toLocaleLowerCase();
-
-  if (
-    [
-      'spell',
-      'enchantment spell',
-      'flash enchantment spell',
-      'hex spell',
-      'item spell',
-      'ward spell',
-      'weapon spell',
-      'well spell',
-    ].includes(normalizedType)
-  ) {
-    return 'spell';
-  }
-
-  if (
-    [
-      'melee attack',
-      'axe attack',
-      'hammer attack',
-      'sword attack',
-      'dagger attack',
-      'lead attack',
-      'off-hand attack',
-      'dual attack',
-      'scythe attack',
-      'pet attack',
-    ].includes(normalizedType)
-  ) {
-    return 'melee-attack';
-  }
-
-  if (['ranged attack', 'bow attack', 'spear attack'].includes(normalizedType)) {
-    return 'ranged-attack';
-  }
-
-  return null;
-}
-
-function compareType(guess: string, answer: string): Result {
-  if (guess === answer) {
-    return 'correct';
-  }
-
-  const guessFamily = typeFamily(guess);
-  const answerFamily = typeFamily(answer);
-
-  if (guessFamily && guessFamily === answerFamily) {
-    return 'partial';
-  }
-
-  return 'none';
-}
-
-function compareCampaign(guess: Skill, answer: Skill): Result {
-  if (guess.campaign === answer.campaign) {
-    return 'correct';
-  }
-
-  return guess.campaign < answer.campaign ? 'higher' : 'lower';
-}
-
-function compareAttributeOrRank(guess: Skill, answer: Skill): Result {
-  const guessLabel = allegianceAttributeName(guess);
-  const answerLabel = allegianceAttributeName(answer);
-
-  if (guessLabel === answerLabel) {
-    return 'correct';
-  }
-
-  const guessIsRankSkill = isRankBasedPveSkill(guess);
-  const answerIsRankSkill = isRankBasedPveSkill(answer);
-
-  if (guessIsRankSkill && answerIsRankSkill) {
-    return 'partial';
-  }
-
-  return 'none';
-}
-
-function gradeGuess(guess: Skill, answer: Skill): GradedGuess {
-  return {
-    skill: guess,
-    results: {
-      profession: compareProfession(
-        professionName(guess),
-        professionName(answer),
-      ),
-      attribute: compareAttributeOrRank(guess, answer),
-      type: compareType(typeName(guess), typeName(answer)),
-      campaign: compareCampaign(guess, answer),
-      elite: compareBoolean(guess.elite, answer.elite),
-      energy: compareNumber(guess.energy, answer.energy),
-      activation: compareNumber(guess.activation, answer.activation),
-      recharge: compareNumber(guess.recharge, answer.recharge),
-    },
-  };
-}
-
 function formatNumber(value: number | null, suffix = ''): string {
   return value === null ? '—' : `${value}${suffix}`;
 }
 
-function formatEnergy(value: number | null): string {
-  return value === null ? '0' : String(value);
+function formatEnergy(skill: Skill): string {
+  return String(energyCost(skill));
 }
 
 function skillIconPath(skill: Skill): string {
@@ -236,16 +69,20 @@ function wikiUrl(skill: Skill): string {
   return `https://wiki.guildwars.com/wiki/${encodeURIComponent(skill.name)}`;
 }
 
-function ResultArrow({ result }: { result: Result }) {
-  if (result === 'higher') {
-    return <span aria-label="The answer is from a later campaign">↑</span>;
+function ResultArrow({
+  result,
+  kind = 'numeric',
+}: {
+  result: Result;
+  kind?: ArrowKind;
+}) {
+  const arrow = resultArrow(result, kind);
+
+  if (!arrow) {
+    return null;
   }
 
-  if (result === 'lower') {
-    return <span aria-label="The answer is from an earlier campaign">↓</span>;
-  }
-
-  return null;
+  return <span aria-label={arrow.label}>{arrow.glyph}</span>;
 }
 
 function restoreDailyProgress(skillById: Map<number, Skill>): DailyProgress {
@@ -508,8 +345,8 @@ export default function App() {
       <section className="legend" aria-label="Feedback legend">
         <span className="legend-item correct">Exact match</span>
         <span className="legend-item partial">Related match</span>
-        <span className="legend-item higher">Answer is higher / later ↑</span>
-        <span className="legend-item lower">Answer is lower / earlier ↓</span>
+        <span className="legend-item higher">Answer is higher ↑ / later →</span>
+        <span className="legend-item lower">Answer is lower ↓ / earlier ←</span>
         <span className="legend-item none">No match</span>
       </section>
 
@@ -524,12 +361,19 @@ export default function App() {
             </li>
             <li>
               Type is yellow when both skills belong to the same broad family but
-              are different subtypes. Spell-family skills, melee attack skills, and
-              ranged attack skills each form a related group.
+              are different subtypes. Spell-family skills, melee attack skills,
+              ranged attack skills, and rituals (Nature, Binding, and Ebon
+              Vanguard) each form a related group.
             </li>
             <li>
-              Campaign arrows compare release order: up means the answer is from a
-              later campaign; down means it is from an earlier campaign.
+              Campaign arrows compare release order (Core, Prophecies, Factions,
+              Nightfall, Eye of the North): → means the answer is from a later
+              campaign; ← means it is from an earlier campaign.
+            </li>
+            <li>
+              Energy, Cast, and Recharge arrows compare values: ↑ means the
+              answer’s value is higher; ↓ means it is lower. Skills with no
+              energy cost count as 0 Energy.
             </li>
             <li>
               Rank-based PvE skills display their associated rank. Different ranks
@@ -556,9 +400,17 @@ export default function App() {
           <div>Recharge</div>
         </div>
 
-        {guesses.map((guess) => (
+        {guesses.map((guess, guessIndex) => (
           <div className="board-row" key={guess.skill.id}>
             <div className="skill-name">
+              {/* Number from the original guess order, so it stays correct
+                  if rows are ever displayed in a different order. */}
+              <span
+                className="guess-number"
+                aria-label={`Guess ${guessIndex + 1}`}
+              >
+                #{guessIndex + 1}
+              </span>
               <img
                 className="guess-skill-icon"
                 src={skillIconPath(guess.skill)}
@@ -568,7 +420,14 @@ export default function App() {
                   event.currentTarget.style.display = 'none';
                 }}
               />
-              <span>{guess.skill.name}</span>
+              <a
+                className="wiki-skill-name"
+                href={wikiUrl(guess.skill)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {guess.skill.name}
+              </a>
             </div>
 
             <div className={`tile ${guess.results.profession}`}>
@@ -585,7 +444,7 @@ export default function App() {
 
             <div className={`tile ${guess.results.campaign}`}>
               {campaignName(guess.skill)}
-              <ResultArrow result={guess.results.campaign} />
+              <ResultArrow result={guess.results.campaign} kind="campaign" />
             </div>
 
             <div className={`tile ${guess.results.elite}`}>
@@ -593,7 +452,7 @@ export default function App() {
             </div>
 
             <div className={`tile ${guess.results.energy}`}>
-              {formatEnergy(guess.skill.energy)}
+              {formatEnergy(guess.skill)}
               <ResultArrow result={guess.results.energy} />
             </div>
 
@@ -656,7 +515,18 @@ export default function App() {
               }}
             />
             <p>
-              The skill was <strong>{answer.name}</strong>.
+              The skill was{' '}
+              <strong>
+                <a
+                  className="wiki-skill-name"
+                  href={wikiUrl(answer)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {answer.name}
+                </a>
+              </strong>
+              .
             </p>
           </div>
 

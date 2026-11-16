@@ -67,12 +67,25 @@ function Find-SkillIconUrl {
   }
 
   $normalizedName = $SkillName.ToLowerInvariant()
+
+  # Prefer the file named exactly after the skill. A substring match alone can
+  # pick a related skill's icon (e.g. Sandstorm -> Mystic Sandstorm,
+  # Lotus Strike -> Black Lotus Strike).
   $candidate = $page.images |
     Where-Object {
-      $_.title -match '^File:' -and
-      $_.title.ToLowerInvariant() -match [regex]::Escape($normalizedName)
+      $_.title.ToLowerInvariant() -match
+        ('^file:' + [regex]::Escape($normalizedName) + '\.(jpg|png)$')
     } |
     Select-Object -First 1
+
+  if (-not $candidate) {
+    $candidate = $page.images |
+      Where-Object {
+        $_.title -match '^File:' -and
+        $_.title.ToLowerInvariant() -match [regex]::Escape($normalizedName)
+      } |
+      Select-Object -First 1
+  }
 
   if (-not $candidate) {
     return $null
