@@ -1,0 +1,319 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import App from './App';
+import { dailyStorageKey } from './lib/modes';
+import { dailySkill, eliteSkills, nmDailySkill, skills } from './lib/skills';
+
+const TODAY = new Date('2026-11-16T12:00:00Z');
+const HM_KEY = 'gw-skilldle-daily-v3:2026-11-16';
+const NM_KEY = 'gw-skilldle-nm-daily-v1:2026-11-16';
+
+const hmAnswer = dailySkill(TODAY);
+const nmAnswer = nmDailySkill(TODAY);
+const hmWrongGuesses = skills.filter((skill) => skill.id !== hmAnswer.id);
+const nmWrongGuesses = eliteSkills.filter((skill) => skill.id !== nmAnswer.id);
+const nonElite = skills.find(
+  (skill) => !skill.elite && skill.id !== hmAnswer.id,
+)!;
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(TODAY);
+  window.localStorage.clear();
+  window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+function renderApp() {
+  const user = userEvent.setup();
+  render(<App />);
+  return user;
+}
+
+async function guess(user: ReturnType<typeof userEvent.setup>, name: string) {
+  fireEvent.change(screen.getByLabelText('Your guess'), {
+    target: { value: name },
+  });
+  await user.click(screen.getByRole('button', { name: 'Guess' }));
+}
+
+function guessRows() {
+  return screen.queryAllByLabelText(/^Guess \d+$/);
+}
+
+function activeMode() {
+  return document.querySelector('.active-mode')?.textContent;
+}
+
+function pressed(name: string) {
+  return screen.getByRole('button', { name }).getAttribute('aria-pressed');
+}
+
+function boardColumnCounts() {
+  const board = screen.getByRole('region', { name: 'Guesses' });
+  return [...board.querySelectorAll('.board-row')].map(
+    (row) => row.children.length,
+  );
+}
+
+describe('startup', () => {
+  it('opens on Daily HM', () => {
+    renderApp();
+    expect(activeMode()).toBe('Daily HM');
+    expect(pressed('HM')).toBe('true');
+    expect(pressed('NM')).toBe('false');
+    expect(pressed('Daily')).toBe('true');
+    expect(pressed('Infinite')).toBe('false');
+    expect(screen.getByText(/Daily puzzle: 2026-11-16/)).toBeTruthy();
+  });
+
+  it('restores HM Daily progress saved before this change', () => {
+    window.localStorage.setItem(
+      HM_KEY,
+      JSON.stringify({
+        guessedSkillIds: [hmWrongGuesses[0].id, hmWrongGuesses[1].id],
+        gaveUp: false,
+      }),
+    );
+
+    renderApp();
+    expect(guessRows()).toHaveLength(2);
+    expect(
+      screen.getByRole('link', { name: hmWrongGuesses[1].name }),
+    ).toBeTruthy();
+  });
+
+  it('still uses the original HM Daily key', () => {
+    expect(dailyStorageKey('hm', TODAY)).toBe(HM_KEY);
+  });
+});
+
+describe('switching modes', () => {
+  it('keeps each Daily’s progress separate and preserves the other selector', async () => {
+    const user = renderApp();
+    await guess(user, hmWrongGuesses[0].name);
+    expect(guessRows()).toHaveLength(1);
+
+    // Difficulty switch keeps Daily.
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    expect(activeMode()).toBe('Daily NM');
+    expect(guessRows()).toHaveLength(0);
+
+    await guess(user, nmWrongGuesses[0].name);
+    await guess(user, nmWrongGuesses[1].name);
+    expect(guessRows()).toHaveLength(2);
+
+    // Play-mode switch keeps NM.
+    await user.click(screen.getByRole('button', { name: 'Infinite' }));
+    expect(activeMode()).toBe('Infinite NM');
+    expect(guessRows()).toHaveLength(0);
+
+    // Difficulty switch keeps Infinite.
+    await user.click(screen.getByRole('button', { name: 'HM' }));
+    expect(activeMode()).toBe('Infinite HM');
+    expect(pressed('Infinite')).toBe('true');
+
+    await user.click(screen.getByRole('button', { name: 'Daily' }));
+    expect(activeMode()).toBe('Daily HM');
+    expect(guessRows()).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    expect(activeMode()).toBe('Daily NM');
+    expect(guessRows()).toHaveLength(2);
+
+    expect(JSON.parse(window.localStorage.getItem(HM_KEY)!)).toEqual({
+      guessedSkillIds: [hmWrongGuesses[0].id],
+      gaveUp: false,
+    });
+    expect(JSON.parse(window.localStorage.getItem(NM_KEY)!)).toEqual({
+      guessedSkillIds: [nmWrongGuesses[0].id, nmWrongGuesses[1].id],
+      gaveUp: false,
+    });
+  });
+
+  it('starts a new Infinite round after leaving Infinite', async () => {
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: 'Infinite' }));
+    await guess(user, hmWrongGuesses[0].name);
+    expect(guessRows()).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Daily' }));
+    await user.click(screen.getByRole('button', { name: 'Infinite' }));
+    expect(guessRows()).toHaveLength(0);
+  });
+
+  it('restarting NM Daily leaves HM Daily progress alone', async () => {
+    const user = renderApp();
+    await guess(user, hmWrongGuesses[0].name);
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    await guess(user, nmWrongGuesses[0].name);
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+    await user.click(
+      screen.getByRole('button', { name: 'Restart today’s puzzle' }),
+    );
+
+    expect(guessRows()).toHaveLength(0);
+    expect(JSON.parse(window.localStorage.getItem(NM_KEY)!).guessedSkillIds)
+      .toEqual([]);
+    expect(JSON.parse(window.localStorage.getItem(HM_KEY)!).guessedSkillIds)
+      .toEqual([hmWrongGuesses[0].id]);
+  });
+});
+
+describe('NM guesses', () => {
+  it('offers only elite skills as suggestions', async () => {
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+
+    const options = [
+      ...document.querySelectorAll<HTMLOptionElement>('#skill-options option'),
+    ].map((option) => option.value);
+    const eliteNames = new Set(eliteSkills.map((skill) => skill.name));
+
+    expect(options).toHaveLength(eliteSkills.length);
+    expect(options.every((name) => eliteNames.has(name))).toBe(true);
+  });
+
+  it('rejects non-elite and invalid guesses without counting them', async () => {
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+
+    await guess(user, nonElite.name);
+    expect(screen.getByText('Skilldle NM only accepts elite skills.')).toBeTruthy();
+    expect(guessRows()).toHaveLength(0);
+
+    await guess(user, 'Not A Real Skill');
+    expect(guessRows()).toHaveLength(0);
+
+    await guess(user, nmWrongGuesses[0].name);
+    expect(guessRows()).toHaveLength(1);
+    expect(screen.getByLabelText('Guess 1')).toBeTruthy();
+
+    await guess(user, nonElite.name);
+    expect(guessRows()).toHaveLength(1);
+
+    await guess(user, nmWrongGuesses[1].name);
+    expect(screen.getByLabelText('Guess 2')).toBeTruthy();
+  });
+
+  it('still accepts non-elite guesses in HM', async () => {
+    const user = renderApp();
+    await guess(user, nonElite.name);
+    expect(guessRows()).toHaveLength(1);
+  });
+});
+
+describe('Elite column', () => {
+  it('is shown in HM and hidden in NM, with headers and rows aligned', async () => {
+    const user = renderApp();
+    const board = () => screen.getByRole('region', { name: 'Guesses' });
+
+    await guess(user, hmWrongGuesses[0].name);
+    expect(within(board()).getByText('Elite')).toBeTruthy();
+    expect(new Set(boardColumnCounts())).toEqual(new Set([9]));
+
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    await guess(user, nmWrongGuesses[0].name);
+    expect(within(board()).queryByText('Elite')).toBeNull();
+    expect(board().className).toContain('board-nm');
+    expect(new Set(boardColumnCounts())).toEqual(new Set([8]));
+  });
+});
+
+describe('midnight UTC', () => {
+  const BEFORE_MIDNIGHT = new Date('2026-11-16T23:59:00Z');
+  const AFTER_MIDNIGHT = new Date('2026-11-17T00:01:00Z');
+  const keysFor = (prefix: string) => ({
+    loaded: `${prefix}:2026-11-16`,
+    next: `${prefix}:2026-11-17`,
+  });
+
+  it.each([
+    ['HM', 'gw-skilldle-daily-v3', hmWrongGuesses],
+    ['NM', 'gw-skilldle-nm-daily-v1', nmWrongGuesses],
+  ] as const)(
+    '%s Daily saves a post-midnight guess under the loaded date only',
+    async (difficulty, prefix, wrongGuesses) => {
+      vi.setSystemTime(BEFORE_MIDNIGHT);
+      const user = renderApp();
+
+      if (difficulty === 'NM') {
+        await user.click(screen.getByRole('button', { name: 'NM' }));
+      }
+
+      await guess(user, wrongGuesses[0].name);
+
+      vi.setSystemTime(AFTER_MIDNIGHT);
+      await guess(user, wrongGuesses[1].name);
+
+      const keys = keysFor(prefix);
+      expect(JSON.parse(window.localStorage.getItem(keys.loaded)!)).toEqual({
+        guessedSkillIds: [wrongGuesses[0].id, wrongGuesses[1].id],
+        gaveUp: false,
+      });
+      expect(window.localStorage.getItem(keys.next)).toBeNull();
+
+      // The open round keeps showing its own date.
+      expect(screen.getByText(/Daily puzzle: 2026-11-16/)).toBeTruthy();
+    },
+  );
+
+  it('re-entering Daily after midnight loads the new day’s answer and progress', async () => {
+    const nextDay = AFTER_MIDNIGHT;
+    const nextHmAnswer = dailySkill(nextDay);
+    const nextHmGuess = skills.find(
+      (skill) => skill.id !== nextHmAnswer.id && skill.id !== hmAnswer.id,
+    )!;
+    window.localStorage.setItem(
+      'gw-skilldle-daily-v3:2026-11-17',
+      JSON.stringify({ guessedSkillIds: [nextHmGuess.id], gaveUp: false }),
+    );
+
+    vi.setSystemTime(BEFORE_MIDNIGHT);
+    const user = renderApp();
+    expect(guessRows()).toHaveLength(0);
+
+    vi.setSystemTime(nextDay);
+    await user.click(screen.getByRole('button', { name: 'Infinite' }));
+    await user.click(screen.getByRole('button', { name: 'Daily' }));
+
+    expect(screen.getByText(/Daily puzzle: 2026-11-17/)).toBeTruthy();
+    expect(guessRows()).toHaveLength(1);
+    expect(screen.getByRole('link', { name: nextHmGuess.name })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+    expect(document.querySelector('.revealed-answer a')!.textContent).toBe(
+      nextHmAnswer.name,
+    );
+
+    // NM picks up the new day too.
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    expect(screen.getByText(/Daily puzzle: 2026-11-17/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+    expect(document.querySelector('.revealed-answer a')!.textContent).toBe(
+      nmDailySkill(nextDay).name,
+    );
+  });
+});
+
+describe('Infinite NM', () => {
+  it('reveals an elite answer', async () => {
+    const user = renderApp();
+    await user.click(screen.getByRole('button', { name: 'NM' }));
+    await user.click(screen.getByRole('button', { name: 'Infinite' }));
+    await user.click(screen.getByRole('button', { name: /give me the answer/ }));
+
+    const revealed = document.querySelector('.revealed-answer a')!.textContent;
+    expect(eliteSkills.some((skill) => skill.name === revealed)).toBe(true);
+    expect(
+      screen.getByRole('button', { name: 'Next random elite skill' }),
+    ).toBeTruthy();
+  });
+});
