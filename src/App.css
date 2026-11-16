@@ -467,3 +467,212 @@ h1 {
   outline-offset: 0.2rem;
   border-radius: 0.15rem;
 }
+
+/* Skill Library: List/Grid toggle */
+.library-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.view-toggle {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #7a6243;
+  border-radius: 0.5rem;
+  background: #292019;
+}
+
+.view-button {
+  border: 0;
+  border-radius: 0;
+  padding: 0.4rem 0.85rem;
+  color: #d5c7ae;
+  background: transparent;
+  font-weight: 700;
+}
+
+.view-button:hover {
+  background: #403127;
+}
+
+.view-button.active {
+  color: #271b0d;
+  background: #e5b75d;
+}
+
+.view-button:focus-visible {
+  outline: 2px solid #e5c36e;
+  outline-offset: -2px;
+}
+
+/* Skill Library: icon grid */
+.skill-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-width: 760px;
+  margin: 0.75rem 0 0;
+}
+
+.skill-grid-row {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.skill-grid-cell {
+  min-width: 0;
+}
+
+.skill-grid-link {
+  display: block;
+  max-width: 64px;
+  border-radius: 0.3rem;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+.skill-grid-icon {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border: 1px solid #9f7b43;
+  border-radius: 0.3rem;
+  background: #17110d;
+  object-fit: cover;
+  user-select: none;
+}
+
+.skill-grid-link:hover .skill-grid-icon {
+  border-color: #e5c36e;
+}
+
+.skill-grid-link:focus-visible {
+  outline: 3px solid #f4d27a;
+  outline-offset: 2px;
+}
+
+.skill-grid-link.selected .skill-grid-icon {
+  border-color: #f4d27a;
+  box-shadow: 0 0 0 2px #f4d27a;
+}
+
+.skill-grid-tooltip,
+.skill-grid-panel {
+  border: 1px solid #7a6243;
+  border-radius: 0.5rem;
+  color: #f2e6d0;
+  background: #1f1810;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.5);
+}
+
+.skill-grid-tooltip {
+  position: fixed;
+  z-index: 30;
+  width: min(320px, calc(100vw - 16px));
+  padding: 0.65rem 0.75rem;
+}
+
+.skill-grid-popup-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: #fff0b3;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.skill-grid-popup-description {
+  margin: 0.4rem 0 0;
+  color: #d8ceb9;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* Touch details: a non-modal panel along the bottom of the screen. */
+.skill-grid-panel {
+  position: fixed;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 560px;
+  max-height: min(60vh, 26rem);
+  margin: 0 auto;
+  padding: 0.8rem;
+}
+
+.skill-grid-panel:focus {
+  outline: none;
+}
+
+.skill-grid-panel:focus-visible {
+  outline: 2px solid #e5c36e;
+}
+
+.skill-grid-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.skill-grid-panel-header .skill-grid-popup-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.skill-grid-panel-close {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid #7a6243;
+  border-radius: 0.45rem;
+  color: #f2e6d0;
+  background: #292019;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.skill-grid-panel-description {
+  min-height: 0;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.skill-grid-panel-wiki {
+  display: block;
+  flex: 0 0 auto;
+  border: 1px solid #e5b75d;
+  border-radius: 0.45rem;
+  padding: 0.7rem 1rem;
+  color: #261a0d;
+  background: #e5b75d;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.skill-grid-panel-close:focus-visible,
+.skill-grid-panel-wiki:focus-visible {
+  outline: 2px solid #f4d27a;
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
