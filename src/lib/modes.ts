@@ -47,6 +47,17 @@ export function guessPool(difficulty: Difficulty): Skill[] {
   return difficulty === 'nm' ? eliteSkills : skills;
 }
 
+const normalPoolIds = new Set(guessPool('hm').map((skill) => skill.id));
+
+/**
+ * Whether a skill ID is in Skilldle's normal skill pool (every skill Skilldle
+ * HM accepts). Buildle shares this rule: its boss bars, hidden skills, and
+ * guesses must all come from this pool.
+ */
+export function isInSkillPool(skillId: number): boolean {
+  return normalPoolIds.has(skillId);
+}
+
 export function isAllowedGuess(difficulty: Difficulty, skill: Skill): boolean {
   return difficulty === 'hm' || skill.elite;
 }

@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "update-skills": "node scripts/update-skills.mjs && node scripts/normalize-skills.mjs",
+    "buildle:fetch": "node scripts/buildle/fetch-sources.mjs && node scripts/buildle/fetch-categories.mjs",
+    "buildle:build": "node scripts/buildle/build-dataset.mjs",
     "test": "vitest run"
   },
   "dependencies": {

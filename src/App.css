@@ -929,3 +929,287 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Game switcher (Skilldle | Buildle) */
+.game-switcher {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  padding: 0.25rem;
+  border: 1px solid #5c4a31;
+  border-radius: 999px;
+  background: #1f1810;
+}
+
+.game-button {
+  padding: 0.45rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  color: #d8ceb9;
+  background: transparent;
+  min-height: 2.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.game-button.active {
+  color: #1a140c;
+  background: #e5b75d;
+}
+
+.game-button:focus-visible {
+  outline: 2px solid #fff0b3;
+  outline-offset: 2px;
+}
+
+/* A game's wrapper adds no layout box (so Skilldle's sticky guess bar and
+   spacing are unchanged), but hides the whole game while another is shown. */
+.game-view {
+  display: contents;
+}
+
+.game-view[hidden] {
+  display: none;
+}
+
+/* Buildle */
+.buildle-game {
+  padding: 1.25rem;
+  border: 1px solid #5c4a31;
+  border-radius: 0.5rem;
+  background: #1f1810;
+}
+
+.buildle-game h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.buildle-intro,
+.buildle-mode-note {
+  text-align: center;
+  color: #c9bca6;
+}
+
+.buildle-mode-note {
+  font-size: 0.9rem;
+}
+
+.buildle-bar {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 1.25rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buildle-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  min-height: 7.5rem;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid #5c4a31;
+  border-radius: 0.4rem;
+  background: #2a2016;
+  text-align: center;
+}
+
+.buildle-slot-icon {
+  width: 64px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 0.25rem;
+}
+
+.buildle-slot-name {
+  font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.buildle-slot-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.25rem;
+  font-size: 2.5rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* The hidden skill: bright, dashed, and labelled. */
+.buildle-slot.missing {
+  border: 2px dashed #e5b75d;
+  background: #3a2c17;
+}
+
+.buildle-slot.missing .buildle-slot-mark {
+  color: #1a140c;
+  background: #e5b75d;
+}
+
+.buildle-slot-label {
+  color: #f4d27a;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+/* Unused slots: dim, hatched, and crossed out, never skill-like. */
+.buildle-slot.unused {
+  border-style: dotted;
+  background: repeating-linear-gradient(
+    135deg,
+    #1a140c 0 6px,
+    #221a11 6px 12px
+  );
+  opacity: 0.55;
+}
+
+.buildle-slot.unused .buildle-slot-mark {
+  color: #6f604a;
+  font-size: 1.75rem;
+}
+
+.buildle-slot.answer.solved {
+  border: 2px solid #6fbf73;
+  background: #1d2b1a;
+}
+
+.buildle-slot.answer.gave-up {
+  border: 2px solid #c0645a;
+  background: #2b1714;
+}
+
+.buildle-give-up {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.buildle-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #7a3b32;
+  border-radius: 0.4rem;
+  background: #2b1714;
+}
+
+.buildle-confirm p {
+  flex-basis: 100%;
+  margin: 0;
+  color: #f2e6d0;
+}
+
+.buildle-details {
+  margin-bottom: 1rem;
+}
+
+.buildle-details ul {
+  padding-left: 1.1rem;
+}
+
+.buildle-details li p {
+  margin: 0.25rem 0 0.6rem;
+  color: #d8ceb9;
+  font-size: 0.9rem;
+}
+
+.buildle-hint {
+  margin: 0.75rem 0;
+  text-align: center;
+}
+
+.buildle-hint-note {
+  color: #b9a98e;
+  font-size: 0.9rem;
+}
+
+/* Buildle's guess bar stays in the flow (not pinned like Skilldle's). */
+.guess-form.buildle-form {
+  position: static;
+}
+
+.buildle-guesses ol {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0;
+  list-style: none;
+}
+
+.buildle-guess {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #7a3b32;
+  border-radius: 0.4rem;
+  background: #2b1714;
+}
+
+.buildle-guess:not(.incorrect) {
+  border-color: #5c4a31;
+  background: #2a2016;
+}
+
+.buildle-withdrawn {
+  padding: 1rem;
+  border: 1px solid #8a7a52;
+  border-radius: 0.5rem;
+  background: #2a2416;
+}
+
+.buildle-withdrawn h3 {
+  margin-top: 0;
+}
+
+.buildle-withdrawn-original {
+  color: #b9a98e;
+  font-size: 0.9rem;
+}
+
+.buildle-loading,
+.buildle-load-error {
+  padding: 1.25rem;
+  border: 1px solid #5c4a31;
+  border-radius: 0.5rem;
+  background: #1f1810;
+  text-align: center;
+}
+
+.buildle-guess-result {
+  margin-left: auto;
+  color: #f0a59a;
+  font-weight: 800;
+}
+
+.buildle-encounter,
+.buildle-sources,
+.buildle-attribution {
+  color: #b9a98e;
+  font-size: 0.85rem;
+}
+
+.buildle-attribution {
+  margin: 1.5rem 0 0;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .buildle-game {
+    padding: 1rem 0.75rem;
+  }
+
+  .buildle-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

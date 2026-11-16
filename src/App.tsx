@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { ComponentType, FormEvent } from 'react';
 import {
   allegianceAttributeName,
   campaignName,
@@ -30,6 +30,13 @@ import {
 import { skillIconPath, wikiUrl } from './lib/skillLinks';
 import SkillCombobox from './components/SkillCombobox';
 import SkillLibrary from './components/SkillLibrary';
+import {
+  DEFAULT_GAME,
+  GAME_OPTIONS,
+  buildleEnabled,
+  loadBuildle,
+  type Game,
+} from './lib/games';
 import './App.css';
 
 const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
@@ -156,6 +163,11 @@ function loadRound(
   };
 }
 
+/** Buildle is loaded on demand (see loadBuildle). */
+type BuildleLoad =
+  | { status: 'idle' | 'loading' | 'error' }
+  | { status: 'ready'; Game: ComponentType };
+
 export default function App() {
   const boardRef = useRef<HTMLElement>(null);
 
@@ -168,6 +180,30 @@ export default function App() {
     () => loadRound(skillById, 'hm', 'daily'),
     [skillById],
   );
+
+  // Skilldle is the landing view. Switching games only hides Skilldle: its
+  // state lives here and its markup stays mounted, so nothing resets.
+  const [activeGame, setActiveGame] = useState<Game>(DEFAULT_GAME);
+  const skilldleActive = activeGame === 'skilldle';
+  // Buildle loads the first time it is opened, then stays mounted (hidden
+  // while Skilldle is shown) so its rounds, guesses, and hints are kept.
+  const [buildle, setBuildle] = useState<BuildleLoad>({ status: 'idle' });
+
+  function startLoadingBuildle() {
+    setBuildle({ status: 'loading' });
+    loadBuildle().then(
+      (module) => setBuildle({ status: 'ready', Game: module.default }),
+      () => setBuildle({ status: 'error' }),
+    );
+  }
+
+  function changeGame(nextGame: Game) {
+    setActiveGame(nextGame);
+
+    if (nextGame === 'buildle' && buildle.status === 'idle') {
+      startLoadingBuildle();
+    }
+  }
 
   // The page always opens on HM Daily.
   const [difficulty, setDifficulty] = useState<Difficulty>('hm');
@@ -337,6 +373,27 @@ export default function App() {
           with, endorsed by, sponsored by, or approved by ArenaNet or NCSOFT.
         </p>
 
+        {buildleEnabled && (
+          <div className="game-switcher" role="group" aria-label="Game">
+            {GAME_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={
+                  activeGame === option.value
+                    ? 'game-button active'
+                    : 'game-button'
+                }
+                aria-pressed={activeGame === option.value}
+                onClick={() => changeGame(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="game-view" hidden={!skilldleActive}>
         <p>
           Guess {isDaily ? 'today’s' : isNm ? 'an' : 'a'}
           {isNm ? ' elite' : ''} Guild Wars skill.
@@ -407,8 +464,11 @@ export default function App() {
             ? `Daily puzzle: ${dailyDateKey(puzzleDate ?? undefined)}`
             : `Unlimited random ${isNm ? 'elite ' : ''}skills.`}
         </p>
+        </div>
       </header>
 
+      {/* Skilldle stays mounted while hidden, so switching keeps its state. */}
+      <div className="game-view" hidden={!skilldleActive}>
       <section className="legend" aria-label="Feedback legend">
         <span className="legend-item correct">Exact match</span>
         <span className="legend-item partial">Related match</span>
@@ -627,7 +687,27 @@ export default function App() {
         </section>
       )}
 
-      <SkillLibrary nmMode={isNm} />
+      <SkillLibrary nmMode={isNm} active={skilldleActive} />
+      </div>
+
+      {buildleEnabled && buildle.status !== 'idle' && (
+        <div className="game-view" hidden={activeGame !== 'buildle'}>
+          {buildle.status === 'ready' ? (
+            <buildle.Game />
+          ) : buildle.status === 'loading' ? (
+            <p className="buildle-loading" role="status">
+              Loading Buildle…
+            </p>
+          ) : (
+            <div className="buildle-load-error" role="alert">
+              <p>Buildle couldn’t be loaded. Check your connection and try again.</p>
+              <button type="button" onClick={startLoadingBuildle}>
+                Try again
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <footer className="site-footer">
         <p>

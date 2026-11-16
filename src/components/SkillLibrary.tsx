@@ -33,9 +33,18 @@ type SkillLibraryProps = {
    * checkbox and, while it is unchecked, lists elite skills only.
    */
   nmMode?: boolean;
+  /**
+   * False while another game is shown. The library stays mounted (keeping its
+   * tab, filters, and sort) but drops the grid, whose open popups listen on
+   * the whole document for Escape, scrolling, and outside taps.
+   */
+  active?: boolean;
 };
 
-export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
+export default function SkillLibrary({
+  nmMode = false,
+  active = true,
+}: SkillLibraryProps) {
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [selectedLibraryFilter, setSelectedLibraryFilter] =
     useState<LibraryTab>('Warrior');
@@ -304,6 +313,7 @@ export default function SkillLibrary({ nmMode = false }: SkillLibraryProps) {
               </button>
             </div>
           ) : view === 'grid' ? (
+            !active ? null :
             // Keyed by everything that changes the visible icons or their
             // order, so details reset and the Tab stop stays valid.
             <SkillGrid
