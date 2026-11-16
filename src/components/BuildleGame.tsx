@@ -22,6 +22,7 @@ import { skillStatLine } from '../lib/libraryFilters';
 import { guessPool, type Difficulty, type PlayMode } from '../lib/modes';
 import { skillIconPath, wikiUrl } from '../lib/skillLinks';
 import SkillCombobox from './SkillCombobox';
+import SkillLibrary from './SkillLibrary';
 
 type RoundKey = `${PlayMode}-${Difficulty}`;
 
@@ -115,7 +116,15 @@ function createRound(playMode: PlayMode, difficulty: Difficulty): Round {
  * is shown. Each play mode and difficulty keeps its own round for the
  * session; Daily rounds are also saved in this browser.
  */
-export default function BuildleGame() {
+type BuildleGameProps = {
+  /**
+   * False while Skilldle is shown. Buildle stays mounted (keeping its state);
+   * its Skill Library then drops its grid, like Skilldle's does.
+   */
+  active?: boolean;
+};
+
+export default function BuildleGame({ active = true }: BuildleGameProps) {
   // Like Skilldle, Buildle opens on HM Daily.
   const [difficulty, setDifficulty] = useState<Difficulty>('hm');
   const [playMode, setPlayMode] = useState<PlayMode>('daily');
@@ -133,6 +142,9 @@ export default function BuildleGame() {
   const playing = status === 'playing' && puzzle !== null;
   const incorrectIds = guessIds.filter((id) => id !== puzzle?.targetId);
   const canRevealHint = playing && !hintRevealed && hintAvailable(incorrectIds.length);
+  // Guess numbers come from the accepted-guess history itself: rejected
+  // submissions are never in it, so they never take a number.
+  const guessNumber = (id: number) => guessIds.indexOf(id) + 1;
 
   // Save Daily progress (puzzle as published, guesses, hint, status).
   useEffect(() => {
@@ -238,6 +250,7 @@ export default function BuildleGame() {
   const modeLabel = `${isDaily ? 'Daily' : 'Infinite'} ${difficulty.toUpperCase()}`;
 
   return (
+    <>
     <section className="buildle-game" aria-labelledby="buildle-title">
       <h2 id="buildle-title">Buildle</h2>
       <p className="buildle-intro">
@@ -470,6 +483,11 @@ export default function BuildleGame() {
               <h3 id="buildle-result-title">
                 {status === 'solved' ? 'Solved!' : 'You gave up.'}
               </h3>
+              {status === 'solved' && (
+                <p className="buildle-solved-count">
+                  Solved in {guessIds.length} {guessIds.length === 1 ? 'guess' : 'guesses'}.
+                </p>
+              )}
               <p>
                 The missing skill was <strong>{skillFor(puzzle.targetId).name}</strong>, from{' '}
                 <strong>{puzzle.boss.name}</strong>’s skill bar.
@@ -521,6 +539,7 @@ export default function BuildleGame() {
               const skill = skillFor(id);
               return (
                 <li key={id} className="buildle-guess">
+                  <GuessNumber value={guessNumber(id)} />
                   <img className="skill-icon" src={skillIconPath(skill)} alt="" aria-hidden="true" />
                   <span>{skill.name}</span>
                 </li>
@@ -538,6 +557,7 @@ export default function BuildleGame() {
               const skill = skillFor(id);
               return (
                 <li key={id} className="buildle-guess incorrect">
+                  <GuessNumber value={guessNumber(id)} />
                   <img className="skill-icon" src={skillIconPath(skill)} alt="" aria-hidden="true" />
                   <span>{skill.name}</span>
                   <span className="buildle-guess-result">✗ Incorrect</span>
@@ -550,5 +570,22 @@ export default function BuildleGame() {
 
       <p className="buildle-attribution">{buildleAttribution}</p>
     </section>
+
+    {/* The shared Skill Library, below the game as in Skilldle. Browsing
+        only: it follows Buildle's difficulty (NM: elite-only by default) but
+        never changes the puzzle, guesses, suggestions, hint, or saved
+        progress. */}
+    <SkillLibrary nmMode={isNm} active={active} />
+    </>
+  );
+}
+
+/** "#3", read as "Guess 3:". */
+function GuessNumber({ value }: { value: number }) {
+  return (
+    <span className="buildle-guess-number">
+      <span aria-hidden="true">#{value}</span>
+      <span className="visually-hidden">Guess {value}: </span>
+    </span>
   );
 }

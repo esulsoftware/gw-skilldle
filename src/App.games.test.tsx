@@ -39,7 +39,13 @@ function todaysHmDaily() {
 }
 
 const guessInput = () => document.getElementById('skill-input') as HTMLInputElement;
-const select = (label: string) => screen.getByLabelText(label) as HTMLSelectElement;
+/** Skilldle's own views (Buildle's library has the same labels). */
+const skilldleViews = () =>
+  [...document.querySelectorAll('.game-view')].filter((view) => !view.querySelector('.buildle-game'));
+const skilldleLibrary = () =>
+  skilldleViews().find((view) => view.querySelector('.skill-library')) as HTMLElement;
+const select = (label: string) =>
+  within(skilldleLibrary()).getByLabelText(label) as HTMLSelectElement;
 
 function storageSnapshot() {
   return Object.fromEntries(
@@ -77,7 +83,10 @@ describe('game switcher', () => {
     expect(
       screen.getAllByRole('combobox', { name: 'Your guess' }).map((input) => input.id),
     ).toEqual(['buildle-skill-input']);
-    expect(screen.queryByRole('heading', { name: 'Skill Library' })).toBeNull();
+    // Only Buildle's own Skill Library is reachable.
+    const libraries = screen.getAllByRole('heading', { name: 'Skill Library' });
+    expect(libraries).toHaveLength(1);
+    expect(skilldleLibrary().contains(libraries[0])).toBe(false);
     // Only Buildle's own selectors are reachable.
     expect(screen.getAllByRole('group', { name: 'Play mode' })).toHaveLength(1);
     expect(screen.getAllByRole('group', { name: 'Difficulty' })).toHaveLength(1);
@@ -172,8 +181,10 @@ describe('game switcher', () => {
     gameButton('Buildle').focus();
     await user.keyboard('{Enter}');
 
+    // Skilldle's grid (and its open panel) is gone while Skilldle is hidden.
+    expect(skilldleLibrary().querySelector('.skill-grid-panel')).toBeNull();
+    expect(skilldleLibrary().querySelector('[role="grid"]')).toBeNull();
     expect(document.querySelector('.skill-grid-panel')).toBeNull();
-    expect(document.querySelector('[role="grid"]')).toBeNull();
 
     await user.keyboard('{Escape}');
     expect(document.activeElement).toBe(gameButton('Buildle'));
@@ -265,5 +276,89 @@ describe('switching keeps both games’ state', () => {
       await user.tab();
       expect(buildle.contains(document.activeElement)).toBe(false);
     }
+  });
+});
+
+describe('two Skill Libraries (Skilldle and Buildle)', () => {
+  const buildleView = () =>
+    document.querySelector('.buildle-game')!.closest('.game-view') as HTMLElement;
+  const buildleLibrary = () => buildleView().querySelector('.skill-library') as HTMLElement;
+  const inLibrary = (library: HTMLElement) => ({
+    tab: (name: string) => within(library).getByRole('button', { name }),
+    select: (label: string) => within(library).getByLabelText(label) as HTMLSelectElement,
+    activeTab: () => library.querySelector('.profession-button.active')?.textContent,
+  });
+
+  it('keep independent tabs, filters, and sorting, each preserved across switches', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const skilldle = () => inLibrary(skilldleLibrary());
+    const buildle = () => inLibrary(buildleLibrary());
+
+    await user.click(skilldle().tab('Monk'));
+    fireEvent.change(skilldle().select('Type'), { target: { value: 'family:spell' } });
+
+    await openBuildle(user);
+    expect(buildle().activeTab()).toBe('Warrior');
+    expect(buildle().select('Type').value).toBe('all');
+    await user.click(buildle().tab('Ranger'));
+    fireEvent.change(buildle().select('Sort by'), { target: { value: 'energy' } });
+
+    await user.click(gameButton('Skilldle'));
+    expect(skilldle().activeTab()).toBe('Monk');
+    expect(skilldle().select('Type').value).toBe('family:spell');
+    expect(skilldle().select('Sort by').value).toBe('name');
+
+    await user.click(gameButton('Buildle'));
+    expect(buildle().activeTab()).toBe('Ranger');
+    expect(buildle().select('Sort by').value).toBe('energy');
+    expect(buildle().select('Type').value).toBe('all');
+  });
+
+  it('give every element a unique ID, with labels and controls inside their own library', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openBuildle(user);
+    await user.click(within(buildleLibrary()).getByRole('button', { name: 'Grid' }));
+
+    const ids = [...document.querySelectorAll('[id]')].map((element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    for (const library of [skilldleLibrary().querySelector('.skill-library')!, buildleLibrary()]) {
+      const heading = document.getElementById(library.getAttribute('aria-labelledby')!)!;
+      expect(heading.textContent).toBe('Skill Library');
+      expect(library.contains(heading)).toBe(true);
+
+      const toggle = within(library as HTMLElement).getAllByRole('button', { hidden: true })
+        .find((button) => button.hasAttribute('aria-expanded'))!;
+      const content = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+      expect(library.contains(content)).toBe(true);
+    }
+  });
+
+  it('the inactive library shows no grid or floating details and cannot take focus', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(within(skilldleLibrary()).getByRole('button', { name: 'Grid' }));
+    await openBuildle(user);
+
+    // Buildle shown: only its grid exists; Skilldle's is gone.
+    expect(skilldleLibrary().querySelector('[role="grid"]')).toBeNull();
+    const buildleGrid = within(buildleLibrary()).getByRole('grid');
+    fireEvent.pointerOver(within(buildleGrid).getAllByRole('link')[0], { pointerType: 'mouse' });
+    expect(screen.getByTestId('skill-grid-tooltip')).toBeTruthy();
+
+    // Back to Skilldle: Buildle's grid and its open tooltip are removed.
+    await user.click(gameButton('Skilldle'));
+    expect(buildleLibrary().querySelector('[role="grid"]')).toBeNull();
+    expect(screen.queryByTestId('skill-grid-tooltip')).toBeNull();
+    expect(within(skilldleLibrary()).getByRole('grid')).toBeTruthy();
+
+    for (let step = 0; step < 40; step += 1) {
+      await user.tab();
+      expect(buildleView().contains(document.activeElement)).toBe(false);
+    }
+    await user.keyboard('{Escape}');
+    expect(window.scrollTo).not.toHaveBeenCalled();
   });
 });

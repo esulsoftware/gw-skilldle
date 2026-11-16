@@ -109,6 +109,11 @@ function refresh() {
   return user;
 }
 
+/**
+ * The Buildle game area. Spoiler checks look here: the Skill Library below it
+ * lists every skill (including the answer) without singling any out.
+ */
+const gameHtml = () => document.querySelector('.buildle-game')!.innerHTML;
 const bar = () => screen.getByRole('list', { name: 'Boss skill bar' });
 const slotTexts = () => within(bar()).getAllByRole('listitem').map((li) => li.textContent);
 const guessInput = () => screen.getByLabelText('Your guess') as HTMLInputElement;
@@ -170,7 +175,7 @@ describe('Buildle round (HM Daily by default)', () => {
 
   it('shows no hidden skill, boss, location, condition, or boss source before the end', () => {
     renderGame();
-    const html = document.body.innerHTML;
+    const html = gameHtml();
     expect(html).not.toContain('Chilblains');
     expect(html).not.toContain('/skill-icons/144.png');
     for (const spoiler of SPOILERS) {
@@ -256,12 +261,12 @@ describe('give up', () => {
 
     await user.click(screen.getByRole('button', { name: 'Give up / show answer' }));
     expect(screen.getByText(/Give up and show the answer\? This ends the round/)).toBeTruthy();
-    expect(document.body.innerHTML).not.toContain('Chilblains');
+    expect(gameHtml()).not.toContain('Chilblains');
 
     await user.click(screen.getByRole('button', { name: 'Keep playing' }));
     expect(guessInput()).toBeTruthy();
     expect(incorrectGuesses()).toHaveLength(1);
-    expect(document.body.innerHTML).not.toContain('Chilblains');
+    expect(gameHtml()).not.toContain('Chilblains');
   });
 
   it('confirming reveals the answer, boss, and sources as given up, not solved', async () => {
@@ -398,7 +403,7 @@ describe('withdrawn Daily', () => {
     expect(screen.queryByLabelText('Your guess')).toBeNull();
 
     const kept = screen.getByRole('region', { name: 'Your guesses' });
-    expect(within(kept).getAllByRole('listitem')[0].textContent).toBe('Life Siphon');
+    expect(within(kept).getAllByRole('listitem')[0].textContent).toBe('#1Guess 1: Life Siphon');
 
     await again.click(screen.getByRole('button', { name: 'Play Infinite' }));
     expect(activeMode()).toBe('Infinite HM');
@@ -523,7 +528,7 @@ describe('boss-name hint', () => {
 
     await guess(user, WRONG[4]);
     expect(screen.getByRole('button', { name: 'Reveal boss name' })).toBeTruthy();
-    expect(document.body.innerHTML).not.toContain('Grawl Fixture');
+    expect(gameHtml()).not.toContain('Grawl Fixture');
   });
 
   it('reveals the boss name only, keeps the round and target, and stays visible', async () => {
@@ -535,7 +540,7 @@ describe('boss-name hint', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reveal boss name' }));
     expect(screen.getByText('Grawl Fixture')).toBeTruthy();
-    const html = document.body.innerHTML;
+    const html = gameHtml();
     for (const spoiler of SPOILERS.filter((s) => s !== 'Grawl Fixture')) {
       expect(html).not.toContain(spoiler);
     }
@@ -547,5 +552,80 @@ describe('boss-name hint', () => {
 
     await guess(user, 'Chilblains');
     expect(screen.getByRole('heading', { name: 'Solved!' })).toBeTruthy();
+  });
+});
+
+describe('guess numbering', () => {
+  const numbers = () =>
+    incorrectGuesses().map((li) => li.querySelector('.buildle-guess-number')!.textContent);
+
+  it('numbers accepted guesses from 1; invalid, duplicate, and non-elite NM guesses take no number', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    await guess(user, 'Not a skill');
+    await guess(user, 'Life Siphon');
+    await guess(user, 'Fireball');
+
+    expect(numbers()).toEqual(['#1Guess 1: ', '#2Guess 2: ']);
+    expect(incorrectGuesses()[1].textContent).toContain('Fireball');
+
+    await mode(user, 'NM');
+    await guess(user, 'Life Siphon'); // non-elite: rejected in NM
+    await guess(user, 'Migraine');
+    expect(numbers()).toEqual(['#1Guess 1: ']);
+    expect(incorrectGuesses()[0].textContent).toContain('Migraine');
+  });
+
+  it('the winning guess is the next number: "Solved in N guesses"', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    await guess(user, 'Not a skill');
+    await guess(user, 'Fireball');
+    await guess(user, 'Chilblains');
+    expect(screen.getByText('Solved in 3 guesses.')).toBeTruthy();
+  });
+
+  it('uses the singular for a first-guess win', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Chilblains');
+    expect(screen.getByText('Solved in 1 guess.')).toBeTruthy();
+  });
+
+  it('giving up adds no guess and no solved count', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    await giveUp(user);
+    expect(numbers()).toEqual(['#1Guess 1: ']);
+    expect(screen.queryByText(/Solved in/)).toBeNull();
+  });
+
+  it('numbers survive a Daily reload and switching modes and difficulties', async () => {
+    const { user } = renderGame();
+    await guess(user, 'Life Siphon');
+    await guess(user, 'Fireball');
+
+    const again = refresh();
+    expect(numbers()).toEqual(['#1Guess 1: ', '#2Guess 2: ']);
+
+    await mode(again, 'Infinite');
+    await mode(again, 'NM');
+    await mode(again, 'Daily');
+    await mode(again, 'HM');
+    expect(numbers()).toEqual(['#1Guess 1: ', '#2Guess 2: ']);
+    await guess(again, 'Chilblains');
+    expect(screen.getByText('Solved in 3 guesses.')).toBeTruthy();
+  });
+
+  it('a new Infinite round starts again at 1', async () => {
+    const { user } = renderGame();
+    await mode(user, 'Infinite');
+    await guess(user, 'Fireball');
+    await guess(user, 'Meteor');
+    await giveUp(user);
+    await user.click(screen.getByRole('button', { name: 'Next puzzle' }));
+
+    expect(numbers()).toEqual([]);
+    await guess(user, 'Smite');
+    expect(numbers()).toEqual(['#1Guess 1: ']);
   });
 });

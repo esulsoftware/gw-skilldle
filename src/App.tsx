@@ -166,7 +166,7 @@ function loadRound(
 /** Buildle is loaded on demand (see loadBuildle). */
 type BuildleLoad =
   | { status: 'idle' | 'loading' | 'error' }
-  | { status: 'ready'; Game: ComponentType };
+  | { status: 'ready'; Game: ComponentType<{ active: boolean }> };
 
 export default function App() {
   const boardRef = useRef<HTMLElement>(null);
@@ -693,7 +693,7 @@ export default function App() {
       {buildleEnabled && buildle.status !== 'idle' && (
         <div className="game-view" hidden={activeGame !== 'buildle'}>
           {buildle.status === 'ready' ? (
-            <buildle.Game />
+            <buildle.Game active={activeGame === 'buildle'} />
           ) : buildle.status === 'loading' ? (
             <p className="buildle-loading" role="status">
               Loading Buildle…

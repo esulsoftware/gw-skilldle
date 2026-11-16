@@ -1186,6 +1186,17 @@ h1 {
   text-align: center;
 }
 
+.buildle-guess-number {
+  min-width: 2.25rem;
+  color: #e5b75d;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.buildle-solved-count {
+  font-weight: 700;
+}
+
 .buildle-guess-result {
   margin-left: auto;
   color: #f0a59a;
