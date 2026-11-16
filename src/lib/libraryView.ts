@@ -19,3 +19,29 @@ export function saveLibraryView(view: LibraryView): void {
     // The library still works if browser storage is unavailable.
   }
 }
+
+/** NM-only library preference; separate from the List/Grid preference. */
+export const NM_SHOW_NON_ELITE_STORAGE_KEY =
+  'gw-skilldle-library-nm-show-non-elite';
+
+/** Saved "Show non-elite skills" choice; unchecked when missing or invalid. */
+export function readShowNonElite(): boolean {
+  try {
+    return (
+      window.localStorage.getItem(NM_SHOW_NON_ELITE_STORAGE_KEY) === 'true'
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function saveShowNonElite(showNonElite: boolean): void {
+  try {
+    window.localStorage.setItem(
+      NM_SHOW_NON_ELITE_STORAGE_KEY,
+      String(showNonElite),
+    );
+  } catch {
+    // The library still works if browser storage is unavailable.
+  }
+}

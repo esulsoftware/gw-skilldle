@@ -161,3 +161,22 @@ export function dailySkill(date = new Date()): Skill {
 
   return skills[index];
 }
+
+/** Elite skills, in data order. The answer and guess pool for Skilldle NM. */
+export const eliteSkills = skills.filter((skill) => skill.elite);
+
+export function randomEliteSkill(): Skill {
+  const index = Math.floor(Math.random() * eliteSkills.length);
+  return eliteSkills[index];
+}
+
+/**
+ * The NM Daily answer: same UTC date handling as dailySkill, but a separate
+ * seed and the elite-only pool, so it is independent of HM Daily.
+ */
+export function nmDailySkill(date = new Date()): Skill {
+  const key = `gw-skilldle-nm-v1:${dailyDateKey(date)}`;
+  const index = hashString(key) % eliteSkills.length;
+
+  return eliteSkills[index];
+}

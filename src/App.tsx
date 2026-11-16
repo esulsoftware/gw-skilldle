@@ -4,13 +4,21 @@ import {
   allegianceAttributeName,
   campaignName,
   dailyDateKey,
-  dailySkill,
   professionName,
-  randomSkill,
   skills,
   typeName,
   type Skill,
 } from './lib/skills';
+import {
+  dailyAnswer,
+  dailyStorageKey,
+  guessPool,
+  isAllowedGuess,
+  modeLabel,
+  randomAnswer,
+  type Difficulty,
+  type PlayMode,
+} from './lib/modes';
 import {
   energyCost,
   gradeGuess,
@@ -23,22 +31,28 @@ import { skillIconPath, wikiUrl } from './lib/skillLinks';
 import SkillLibrary from './components/SkillLibrary';
 import './App.css';
 
-const DAILY_STORAGE_PREFIX = 'gw-skilldle-daily-v3';
+const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
+  { value: 'nm', label: 'NM' },
+  { value: 'hm', label: 'HM' },
+];
 
-type GameMode = 'daily' | 'practice';
+const PLAY_MODE_OPTIONS: { value: PlayMode; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'infinite', label: 'Infinite' },
+];
 
 type DailyProgress = {
   guessedSkillIds: number[];
   gaveUp: boolean;
 };
 
-function answerForMode(mode: GameMode): Skill {
-  return mode === 'daily' ? dailySkill() : randomSkill();
-}
-
-function dailyStorageKey(): string {
-  return `${DAILY_STORAGE_PREFIX}:${dailyDateKey()}`;
-}
+type Round = {
+  /** The UTC date a Daily round belongs to; null for Infinite rounds. */
+  puzzleDate: Date | null;
+  answer: Skill;
+  guesses: GradedGuess[];
+  gaveUp: boolean;
+};
 
 function formatNumber(value: number | null, suffix = ''): string {
   return value === null ? '—' : `${value}${suffix}`;
@@ -64,9 +78,15 @@ function ResultArrow({
   return <span aria-label={arrow.label}>{arrow.glyph}</span>;
 }
 
-function restoreDailyProgress(skillById: Map<number, Skill>): DailyProgress {
+function restoreDailyProgress(
+  skillById: Map<number, Skill>,
+  difficulty: Difficulty,
+  puzzleDate: Date,
+): DailyProgress {
   try {
-    const savedProgress = window.localStorage.getItem(dailyStorageKey());
+    const savedProgress = window.localStorage.getItem(
+      dailyStorageKey(difficulty, puzzleDate),
+    );
 
     if (!savedProgress) {
       return { guessedSkillIds: [], gaveUp: false };
@@ -91,12 +111,48 @@ function restoreDailyProgress(skillById: Map<number, Skill>): DailyProgress {
     return {
       guessedSkillIds: progress.guessedSkillIds
         .filter((id): id is number => typeof id === 'number')
-        .filter((id) => skillById.has(id)),
+        .filter((id) => skillById.has(id))
+        .filter((id) => isAllowedGuess(difficulty, skillById.get(id)!)),
       gaveUp: progress.gaveUp === true,
     };
   } catch {
     return { guessedSkillIds: [], gaveUp: false };
   }
+}
+
+function newInfiniteRound(difficulty: Difficulty): Round {
+  return {
+    puzzleDate: null,
+    answer: randomAnswer(difficulty),
+    guesses: [],
+    gaveUp: false,
+  };
+}
+
+/** The round to show for a mode: saved Daily progress, or a new Infinite round. */
+function loadRound(
+  skillById: Map<number, Skill>,
+  difficulty: Difficulty,
+  playMode: PlayMode,
+): Round {
+  if (playMode === 'infinite') {
+    return newInfiniteRound(difficulty);
+  }
+
+  // Fix the date once, so the answer, displayed date and storage key all
+  // refer to the same puzzle even if the page stays open past midnight UTC.
+  const puzzleDate = new Date();
+  const answer = dailyAnswer(difficulty, puzzleDate);
+  const progress = restoreDailyProgress(skillById, difficulty, puzzleDate);
+
+  return {
+    puzzleDate,
+    answer,
+    guesses: progress.guessedSkillIds.map((id) =>
+      gradeGuess(skillById.get(id)!, answer),
+    ),
+    gaveUp: progress.gaveUp,
+  };
 }
 
 export default function App() {
@@ -107,19 +163,20 @@ export default function App() {
     [],
   );
 
-  const initialDailyProgress = useMemo(
-    () => restoreDailyProgress(skillById),
+  const initialRound = useMemo(
+    () => loadRound(skillById, 'hm', 'daily'),
     [skillById],
   );
 
-  const [mode, setMode] = useState<GameMode>('daily');
-  const [answer, setAnswer] = useState<Skill>(() => dailySkill());
-  const [guesses, setGuesses] = useState<GradedGuess[]>(() =>
-    initialDailyProgress.guessedSkillIds.map((id) =>
-      gradeGuess(skillById.get(id)!, dailySkill()),
-    ),
+  // The page always opens on HM Daily.
+  const [difficulty, setDifficulty] = useState<Difficulty>('hm');
+  const [playMode, setPlayMode] = useState<PlayMode>('daily');
+  const [puzzleDate, setPuzzleDate] = useState<Date | null>(
+    initialRound.puzzleDate,
   );
-  const [gaveUp, setGaveUp] = useState(initialDailyProgress.gaveUp);
+  const [answer, setAnswer] = useState<Skill>(initialRound.answer);
+  const [guesses, setGuesses] = useState<GradedGuess[]>(initialRound.guesses);
+  const [gaveUp, setGaveUp] = useState(initialRound.gaveUp);
   const [input, setInput] = useState('');
   const [message, setMessage] = useState('');
 
@@ -140,15 +197,18 @@ export default function App() {
   );
 
   const availableSkills = useMemo(
-    () => skills.filter((skill) => !guessedSkillIdSet.has(skill.id)),
-    [guessedSkillIdSet],
+    () =>
+      guessPool(difficulty).filter((skill) => !guessedSkillIdSet.has(skill.id)),
+    [difficulty, guessedSkillIdSet],
   );
 
   const won = guesses.some((guess) => guess.skill.id === answer.id);
   const gameOver = won || gaveUp;
+  const isNm = difficulty === 'nm';
+  const isDaily = playMode === 'daily';
 
   useEffect(() => {
-    if (mode !== 'daily') {
+    if (playMode !== 'daily' || puzzleDate === null) {
       return;
     }
 
@@ -158,49 +218,38 @@ export default function App() {
     };
 
     try {
-      window.localStorage.setItem(dailyStorageKey(), JSON.stringify(progress));
+      window.localStorage.setItem(
+        dailyStorageKey(difficulty, puzzleDate),
+        JSON.stringify(progress),
+      );
     } catch {
       // The game still works if browser storage is unavailable.
     }
-  }, [gaveUp, guesses, mode]);
+  }, [difficulty, gaveUp, guesses, playMode, puzzleDate]);
 
-  function resetRound(nextMode = mode) {
-    setAnswer(answerForMode(nextMode));
-    setGuesses([]);
-    setGaveUp(false);
+  function showRound(round: Round) {
+    setPuzzleDate(round.puzzleDate);
+    setAnswer(round.answer);
+    setGuesses(round.guesses);
+    setGaveUp(round.gaveUp);
     setInput('');
     setMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function changeMode(nextMode: GameMode) {
-    if (nextMode === mode) {
+  function resetRound() {
+    showRound(newInfiniteRound(difficulty));
+  }
+
+  function changeMode(nextDifficulty: Difficulty, nextPlayMode: PlayMode) {
+    if (nextDifficulty === difficulty && nextPlayMode === playMode) {
       return;
     }
 
-    setMode(nextMode);
-    setInput('');
-    setMessage('');
-
-    if (nextMode === 'daily') {
-      const dailyProgress = restoreDailyProgress(skillById);
-      const dailyAnswer = dailySkill();
-
-      setAnswer(dailyAnswer);
-      setGuesses(
-        dailyProgress.guessedSkillIds.map((id) =>
-          gradeGuess(skillById.get(id)!, dailyAnswer),
-        ),
-      );
-      setGaveUp(dailyProgress.gaveUp);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setAnswer(randomSkill());
-    setGuesses([]);
-    setGaveUp(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setDifficulty(nextDifficulty);
+    setPlayMode(nextPlayMode);
+    // Daily progress is restored; an Infinite round always starts fresh.
+    showRound(loadRound(skillById, nextDifficulty, nextPlayMode));
   }
 
   function giveUp() {
@@ -230,6 +279,11 @@ export default function App() {
       return;
     }
 
+    if (!isAllowedGuess(difficulty, selectedSkill)) {
+      setMessage('Skilldle NM only accepts elite skills.');
+      return;
+    }
+
     setGuesses((currentGuesses) => [
       ...currentGuesses,
       gradeGuess(selectedSkill, answer),
@@ -252,13 +306,21 @@ export default function App() {
   }
 
   function resetDailyProgress() {
-    window.localStorage.removeItem(dailyStorageKey());
-    setAnswer(dailySkill());
-    setGuesses([]);
-    setGaveUp(false);
-    setInput('');
-    setMessage('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Restarts the puzzle this round was loaded for.
+    const date = puzzleDate ?? new Date();
+
+    try {
+      window.localStorage.removeItem(dailyStorageKey(difficulty, date));
+    } catch {
+      // The game still works if browser storage is unavailable.
+    }
+
+    showRound({
+      puzzleDate: date,
+      answer: dailyAnswer(difficulty, date),
+      guesses: [],
+      gaveUp: false,
+    });
   }
 
   return (
@@ -271,35 +333,76 @@ export default function App() {
           with, endorsed by, sponsored by, or approved by ArenaNet or NCSOFT.
         </p>
 
-        <p>Guess {mode === 'daily' ? 'today’s' : 'a'} Guild Wars skill.</p>
+        <p>
+          Guess {isDaily ? 'today’s' : isNm ? 'an' : 'a'}
+          {isNm ? ' elite' : ''} Guild Wars skill.
+        </p>
 
-        <div className="mode-switcher" aria-label="Game mode">
-          <button
-            type="button"
-            className={mode === 'daily' ? 'mode-button active' : 'mode-button'}
-            onClick={() => changeMode('daily')}
-          >
-            Daily
-          </button>
+        <div className="mode-selectors">
+          <div className="mode-selector">
+            <span id="difficulty-label" className="mode-selector-label">
+              Difficulty
+            </span>
+            <div
+              className="mode-switcher"
+              role="group"
+              aria-labelledby="difficulty-label"
+            >
+              {DIFFICULTY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={
+                    difficulty === option.value
+                      ? 'mode-button active'
+                      : 'mode-button'
+                  }
+                  aria-pressed={difficulty === option.value}
+                  onClick={() => changeMode(option.value, playMode)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <button
-            type="button"
-            className={
-              mode === 'practice' ? 'mode-button active' : 'mode-button'
-            }
-            onClick={() => changeMode('practice')}
-          >
-            Practice
-          </button>
+          <div className="mode-selector">
+            <span id="play-mode-label" className="mode-selector-label">
+              Play mode
+            </span>
+            <div
+              className="mode-switcher"
+              role="group"
+              aria-labelledby="play-mode-label"
+            >
+              {PLAY_MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={
+                    playMode === option.value
+                      ? 'mode-button active'
+                      : 'mode-button'
+                  }
+                  aria-pressed={playMode === option.value}
+                  onClick={() => changeMode(difficulty, option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {mode === 'daily' && (
-          <p className="daily-date">Daily puzzle: {dailyDateKey()}</p>
-        )}
-
-        {mode === 'practice' && (
-          <p className="daily-date">Practice mode: unlimited random skills.</p>
-        )}
+        <p className="daily-date" aria-live="polite">
+          <strong className="active-mode">
+            {modeLabel(difficulty, playMode)}
+          </strong>
+          {' · '}
+          {isDaily
+            ? `Daily puzzle: ${dailyDateKey(puzzleDate ?? undefined)}`
+            : `Unlimited random ${isNm ? 'elite ' : ''}skills.`}
+        </p>
       </header>
 
       <section className="legend" aria-label="Feedback legend">
@@ -314,6 +417,18 @@ export default function App() {
         <details>
           <summary>Rules &amp; Notes</summary>
           <ul>
+            <li>
+              Difficulty: HM uses every skill. NM uses elite skills only — the
+              answer is always elite, only elite skills can be guessed, and the
+              Elite column is hidden.
+            </li>
+            <li>
+              Daily has one puzzle per UTC day for each difficulty, and your
+              progress is saved separately for Daily HM and Daily NM in this
+              browser. Infinite rounds are not saved: switching difficulty,
+              switching to Daily, or reloading the page starts a new Infinite
+              round when you return.
+            </li>
             <li>
               Profession is yellow when both professions use the same armor class:
               Warrior and Paragon; Ranger, Assassin, and Dervish; or Monk,
@@ -347,14 +462,18 @@ export default function App() {
         </details>
       </section>
 
-      <section ref={boardRef} className="board" aria-label="Guesses">
+      <section
+        ref={boardRef}
+        className={isNm ? 'board board-nm' : 'board'}
+        aria-label="Guesses"
+      >
         <div className="board-row board-header">
           <div>Skill</div>
           <div>Profession</div>
           <div>Attribute / Rank</div>
           <div>Type</div>
           <div>Campaign</div>
-          <div>Elite</div>
+          {!isNm && <div>Elite</div>}
           <div>Energy</div>
           <div>Cast</div>
           <div>Recharge</div>
@@ -407,9 +526,11 @@ export default function App() {
               <ResultArrow result={guess.results.campaign} kind="campaign" />
             </div>
 
-            <div className={`tile ${guess.results.elite}`}>
-              {guess.skill.elite ? 'Yes' : 'No'}
-            </div>
+            {!isNm && (
+              <div className={`tile ${guess.results.elite}`}>
+                {guess.skill.elite ? 'Yes' : 'No'}
+              </div>
+            )}
 
             <div className={`tile ${guess.results.energy}`}>
               {formatEnergy(guess.skill)}
@@ -440,7 +561,11 @@ export default function App() {
               autoComplete="off"
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Start typing a Guild Wars skill..."
+              placeholder={
+                isNm
+                  ? 'Start typing an elite Guild Wars skill...'
+                  : 'Start typing a Guild Wars skill...'
+              }
             />
 
             <datalist id="skill-options">
@@ -492,19 +617,19 @@ export default function App() {
 
           <p className="answer-description">{answer.description}</p>
 
-          {mode === 'daily' ? (
+          {isDaily ? (
             <button type="button" onClick={resetDailyProgress}>
               Restart today’s puzzle
             </button>
           ) : (
-            <button type="button" onClick={() => resetRound()}>
-              Next random skill
+            <button type="button" onClick={resetRound}>
+              {isNm ? 'Next random elite skill' : 'Next random skill'}
             </button>
           )}
         </section>
       )}
 
-      <SkillLibrary />
+      <SkillLibrary nmMode={isNm} />
 
       <footer className="site-footer">
         <p>
